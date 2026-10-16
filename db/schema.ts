@@ -25,3 +25,18 @@ export const workspaceMembers = sqliteTable('workspace_members', {
   index('workspace_members_user_idx').on(table.memberUserId),
   index('workspace_members_email_idx').on(table.memberEmail),
 ]);
+
+export const workspaceAuditLog = sqliteTable('workspace_audit_log', {
+  id: text('id').primaryKey(),
+  workspaceOwnerId: text('workspace_owner_id').notNull().references(() => workspaces.ownerId, { onDelete: 'cascade' }),
+  actorUserId: text('actor_user_id').notNull(),
+  actorEmail: text('actor_email').notNull(),
+  actorName: text('actor_name').notNull(),
+  actorRole: text('actor_role', { enum: ['owner', 'admin'] }).notNull(),
+  action: text('action').notNull(),
+  summary: text('summary').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  index('workspace_audit_owner_created_idx').on(table.workspaceOwnerId, table.createdAt),
+  index('workspace_audit_actor_idx').on(table.actorUserId),
+]);

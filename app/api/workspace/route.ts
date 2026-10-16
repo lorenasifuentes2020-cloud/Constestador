@@ -2,6 +2,10 @@ import { env } from 'cloudflare:workers';
 import { z } from 'zod';
 import { mutateWorkspace, DomainError, type Workspace } from '../../../lib/domain';
 import {
+  describeWorkspaceAction,
+  recordWorkspaceActivity,
+} from '../../../lib/workspace-audit';
+import {
   resolveWorkspaceAccess,
   selectedWorkspaceOwner,
 } from '../../../lib/workspace-access';
@@ -36,7 +40,7 @@ async function context(request: Request) {
     user,
     selectedWorkspaceOwner(request),
   );
-  return { access, db: env.DB };
+  return { access, db: env.DB, user };
 }
 
 function failure(error: unknown) {
@@ -80,7 +84,7 @@ export async function POST(request: Request) {
       return json({ error: 'Origen no permitido.' }, 403);
     }
 
-    const { access, db } = await context(request);
+    const { access, db, user } = await context(request);
     const raw = await request.text();
     if (raw.length > 100000) return json({ error: 'Solicitud demasiado grande.' }, 413);
 
@@ -137,6 +141,13 @@ export async function POST(request: Request) {
         error: 'Otro cambio se guardó al mismo tiempo. Actualiza la página antes de continuar.',
       }, 409);
     }
+
+    await recordWorkspaceActivity(db, {
+      access,
+      user,
+      action: body.type,
+      summary: describeWorkspaceAction(body.type, body.payload),
+    });
 
     return json({ workspace, version: row.version + 1, access });
   } catch (error) {

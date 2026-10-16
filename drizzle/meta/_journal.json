@@ -15,6 +15,13 @@
       "when": 1792179207676,
       "tag": "0001_heavy_wild_child",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792179907479,
+      "tag": "0002_sour_blob",
+      "breakpoints": true
     }
   ]
 }

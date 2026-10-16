@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Check,
   ExternalLink,
+  History,
   LoaderCircle,
   Mail,
   ShieldCheck,
@@ -31,11 +32,22 @@ type Member = {
   joined_at: string | null;
 };
 
+type Activity = {
+  id: string;
+  actor_email: string;
+  actor_name: string;
+  actor_role: 'owner' | 'admin';
+  action: string;
+  summary: string;
+  created_at: string;
+};
+
 type TeamData = {
   current: Space;
   spaces: Space[];
   canManageTeam: boolean;
   members: Member[];
+  activity: Activity[];
   maxMembers: number;
   signedInEmail: string;
 };
@@ -83,10 +95,10 @@ export default function TeamPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      const result = await response.json() as { members?: Member[]; error?: string };
+      const result = await response.json() as { members?: Member[]; activity?: Activity[]; error?: string };
       if (!response.ok) throw new Error(result.error || 'No se pudo enviar la invitación.');
       setData(current => current && result.members
-        ? { ...current, members: result.members }
+        ? { ...current, members: result.members, activity: result.activity ?? current.activity }
         : current);
       setEmail('');
       setNotice('Invitación creada. Comparte el enlace de Nexo con esta persona.');
@@ -105,10 +117,10 @@ export default function TeamPanel({
       const response = await fetch(`/api/team?id=${encodeURIComponent(member.id)}`, {
         method: 'DELETE',
       });
-      const result = await response.json() as { members?: Member[]; error?: string };
+      const result = await response.json() as { members?: Member[]; activity?: Activity[]; error?: string };
       if (!response.ok) throw new Error(result.error || 'No se pudo quitar el acceso.');
       setData(current => current && result.members
-        ? { ...current, members: result.members }
+        ? { ...current, members: result.members, activity: result.activity ?? current.activity }
         : current);
       setNotice('Acceso retirado.');
     } catch (cause) {
@@ -216,6 +228,25 @@ export default function TeamPanel({
             <ShieldCheck size={22} />
             <div><strong>Eres administradora de este espacio</strong><p>Puedes gestionar las tiendas. Solo la propietaria puede invitar o retirar miembros.</p></div>
           </section>}
+
+          <section className={styles.card}>
+            <div className={styles.cardHeading}>
+              <div><h2>Actividad reciente</h2><p>Últimos cambios hechos por el equipo en este espacio.</p></div>
+              <History size={21} />
+            </div>
+            <div className={styles.activityList}>
+              {data.activity.length === 0
+                ? <div className={styles.empty}>Los próximos cambios del equipo aparecerán aquí.</div>
+                : data.activity.map(item => <article className={styles.activity} key={item.id}>
+                    <span className={styles.avatar}>{initials(item.actor_name || item.actor_email)}</span>
+                    <div>
+                      <strong>{item.summary}</strong>
+                      <small>{item.actor_name || item.actor_email} · {item.actor_role === 'owner' ? 'Propietaria' : 'Administradora'}</small>
+                    </div>
+                    <time dateTime={item.created_at}>{activityDate(item.created_at)}</time>
+                  </article>)}
+            </div>
+          </section>
         </>}
       </section>
     </main>
@@ -224,4 +255,15 @@ export default function TeamPanel({
 
 function initials(value: string) {
   return value.trim().split(/[@\s._-]+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase();
+}
+
+function activityDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Fecha desconocida';
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
 }

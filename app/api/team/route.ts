@@ -7,6 +7,10 @@ import {
   resolveWorkspaceAccess,
   selectedWorkspaceOwner,
 } from '../../../lib/workspace-access';
+import {
+  listWorkspaceActivity,
+  recordWorkspaceActivity,
+} from '../../../lib/workspace-audit';
 import { getChatGPTUser, type ChatGPTUser } from '../../chatgpt-auth';
 
 export const dynamic = 'force-dynamic';
@@ -67,12 +71,14 @@ export async function GET(request: Request) {
     const members = canManageTeam
       ? await listMembers(db, user.userId)
       : [];
+    const activity = await listWorkspaceActivity(db, current.ownerId);
 
     return json({
       current,
       spaces,
       canManageTeam,
       members,
+      activity,
       maxMembers: MAX_TEAM_MEMBERS,
       signedInEmail: normalizeTeamEmail(user.email),
     });
@@ -85,7 +91,7 @@ export async function POST(request: Request) {
   try {
     ensureSameOrigin(request);
     const { user, db } = await context();
-    await requireOwner(db, user, request);
+    const access = await requireOwner(db, user, request);
 
     const raw = await request.text();
     if (raw.length > 5000) return json({ error: 'Solicitud demasiado grande.' }, 413);
@@ -155,7 +161,17 @@ export async function POST(request: Request) {
       ).run();
     }
 
-    return json({ members: await listMembers(db, user.userId) }, 201);
+    await recordWorkspaceActivity(db, {
+      access,
+      user,
+      action: 'team.invite',
+      summary: `Invitó a ${email} como administrador`,
+    });
+
+    return json({
+      members: await listMembers(db, user.userId),
+      activity: await listWorkspaceActivity(db, user.userId),
+    }, 201);
   } catch (error) {
     if (error instanceof SyntaxError) return json({ error: 'Solicitud inválida.' }, 400);
     return failure(error);
@@ -166,13 +182,26 @@ export async function DELETE(request: Request) {
   try {
     ensureSameOrigin(request);
     const { user, db } = await context();
-    await requireOwner(db, user, request);
+    const access = await requireOwner(db, user, request);
     const id = z.string().uuid().parse(new URL(request.url).searchParams.get('id'));
+    const member = await db.prepare(
+      'SELECT member_email FROM workspace_members WHERE id = ? AND workspace_owner_id = ?',
+    ).bind(id, user.userId).first<{ member_email: string }>();
+    if (!member) return json({ error: 'Miembro no encontrado.' }, 404);
     const result = await db.prepare(
       'DELETE FROM workspace_members WHERE id = ? AND workspace_owner_id = ?',
     ).bind(id, user.userId).run();
     if (result.meta.changes !== 1) return json({ error: 'Miembro no encontrado.' }, 404);
-    return json({ members: await listMembers(db, user.userId) });
+    await recordWorkspaceActivity(db, {
+      access,
+      user,
+      action: 'team.remove',
+      summary: `Retiró el acceso de ${member.member_email}`,
+    });
+    return json({
+      members: await listMembers(db, user.userId),
+      activity: await listWorkspaceActivity(db, user.userId),
+    });
   } catch (error) {
     return failure(error);
   }
@@ -189,6 +218,7 @@ async function requireOwner(db: D1Database, user: ChatGPTUser, request: Request)
       status: 403,
     });
   }
+  return current;
 }
 
 async function listMembers(db: D1Database, ownerId: string) {
