@@ -19,8 +19,8 @@ test('incluye estados permitidos y usa un texto seguro para valores extraños', 
     'Cambió el estado de un pedido a entregado',
   );
   assert.equal(
-    describeWorkspaceAction('order.payment', { paymentStatus: '<script>' }),
-    'Cambió el pago de un pedido a',
+    describeWorkspaceAction('order.payment.add', { amount: 50, reference: '<script>' }),
+    'Registró un abono verificado',
   );
 });
 

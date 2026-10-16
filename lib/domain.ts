@@ -1,7 +1,8 @@
 import { z } from 'zod';
 export type Product = {id:string;name:string;sku:string;category:string;price:number;stock:number;description:string;active:boolean};
 export type Contact = {id:string;name:string;phone:string;email:string;stage:string;notes:string};
-export type Order = {id:string;number:string;contactId:string;customer:string;items:{productId:string;name:string;quantity:number;price:number}[];total:number;status:string;paymentStatus:string;channel:string;createdAt:string;notes:string};
+export type Payment = {id:string;amount:number;method:string;reference:string;createdAt:string};
+export type Order = {id:string;number:string;contactId:string;customer:string;items:{productId:string;name:string;quantity:number;price:number}[];total:number;status:string;paymentStatus:string;paymentPlan?:'province-advance'|'lima-cod';expectedAdvance?:number;payments?:Payment[];channel:string;createdAt:string;notes:string};
 export type Entry = {id:string;title:string;content:string;active:boolean};
 export type Agent = {name:string;tone:string;description:string;greeting:string;instructions:string;shipping:string;payments:string;returns:string};
 export type Store = {id:string;name:string;category:string;color:string;createdAt:string;demo:boolean;products:Product[];contacts:Contact[];orders:Order[];faqs:Entry[];rules:Entry[];promotions:Entry[];agent:Agent;modules:{wholesale:boolean;advisors:boolean}};
@@ -14,6 +15,7 @@ const product=z.object({id:id.optional(),name:required(),sku:str(60),category:st
 const contact=z.object({id:id.optional(),name:required(),phone:str(30),email:z.union([z.literal(''),z.string().email()]).default(''),stage:z.enum(['Nuevo','En conversación','Cliente','Inactivo']),notes:str(2000)});
 const entry=z.object({id:id.optional(),title:required(200),content:required(4000),active:z.boolean()});
 const agent=z.object({name:required(80),tone:z.enum(['Cercano','Profesional','Entusiasta']),description:str(4000),greeting:str(1000),instructions:str(8000),shipping:str(3000),payments:str(3000),returns:str(3000)});
+const paymentMethod=z.enum(['Efectivo','Yape','Plin','Transferencia','Tarjeta','Otro']);
 export const DEFAULT_PAYMENTS='Provincias fuera de Lima: adelanto del 50% del valor de los productos, envío por Shalom y pago posterior del saldo. Lima: opción de pago al recibir en casa con el motorizado. Confirmar con la tienda el momento exacto del saldo y los costos de envío. Un adelanto no es un pago completo.';
 export const DEFAULT_SHIPPING='Provincias fuera de Lima: envío por Shalom después del adelanto del 50% del valor de los productos. Lima: entrega a domicilio con motorizado y opción de pago al recibir. Confirmar cobertura, tarifa y plazos con la tienda.';
 const uid=()=>crypto.randomUUID();
@@ -44,13 +46,14 @@ export function mutateWorkspace(current:Workspace,type:string,payload:any):Works
  case 'promotion.save':upsert(s.promotions,entry.parse(payload));break;
  case 'modules.save':s.modules=z.object({wholesale:z.boolean(),advisors:z.boolean()}).parse(payload);break;
  case 'order.create':{
-  const o=z.object({contactId:id,items:z.array(z.object({productId:id,quantity:z.number().int().min(1).max(10000)})).min(1).max(50),channel:z.enum(['Manual','WhatsApp','Instagram','Web']),notes:str(2000),paymentStatus:z.enum(['Pendiente','Pagado'])}).parse(payload);
+  const o=z.object({contactId:id,items:z.array(z.object({productId:id,quantity:z.number().int().min(1).max(10000)})).min(1).max(50),channel:z.enum(['Manual','WhatsApp','Instagram','Web']),notes:str(2000),paymentPlan:z.enum(['province-advance','lima-cod'])}).parse(payload);
   const c=s.contacts.find(c=>c.id===o.contactId);if(!c)throw new DomainError('Selecciona un cliente de esta tienda.');
   const quantities=new Map<string,number>();o.items.forEach(x=>quantities.set(x.productId,(quantities.get(x.productId)||0)+x.quantity));
   const lines=Array.from(quantities,([productId,quantity])=>{const p=s.products.find(p=>p.id===productId&&p.active);if(!p)throw new DomainError('Producto no disponible en esta tienda.');if(p.stock<quantity)throw new DomainError('Stock insuficiente para '+p.name+'.');return {productId,name:p.name,quantity,price:p.price};});
   for(const l of lines)s.products.find(p=>p.id===l.productId)!.stock-=l.quantity;
   const total=Math.round(lines.reduce((a,l)=>a+l.price*l.quantity,0)*100)/100;
-  s.orders.unshift({id:uid(),number:'NX-'+String(s.orders.length+1).padStart(4,'0'),contactId:c.id,customer:c.name,items:lines,total,status:'Pendiente',paymentStatus:o.paymentStatus,channel:o.channel,createdAt:new Date().toISOString(),notes:o.notes});c.stage='Cliente';break;
+  const expectedAdvance=o.paymentPlan==='province-advance'?money(total/2):0;
+  s.orders.unshift({id:uid(),number:'NX-'+String(s.orders.length+1).padStart(4,'0'),contactId:c.id,customer:c.name,items:lines,total,status:'Pendiente',paymentStatus:'Pendiente',paymentPlan:o.paymentPlan,expectedAdvance,payments:[],channel:o.channel,createdAt:new Date().toISOString(),notes:o.notes});c.stage='Cliente';break;
  }
  case 'order.status':{
   const d=z.object({orderId:id,status:z.enum(['Pendiente','Confirmado','Enviado','Entregado','Cancelado'])}).parse(payload);const o=s.orders.find(o=>o.id===d.orderId);if(!o)throw new DomainError('Pedido no encontrado.');
@@ -58,12 +61,22 @@ export function mutateWorkspace(current:Workspace,type:string,payload:any):Works
   if(o.status===d.status)return w;if(!allowed[o.status].includes(d.status))throw new DomainError('Ese cambio de estado no está permitido.');
   if(d.status==='Cancelado')for(const l of o.items){const p=s.products.find(p=>p.id===l.productId);if(p)p.stock+=l.quantity;}o.status=d.status;break;
  }
- case 'order.payment':{const d=z.object({orderId:id,paymentStatus:z.enum(['Pendiente','Pagado'])}).parse(payload);const o=s.orders.find(o=>o.id===d.orderId);if(!o||o.status==='Cancelado')throw new DomainError('No se puede modificar ese pedido.');o.paymentStatus=d.paymentStatus;break;}
+ case 'order.payment.add':{
+  const d=z.object({orderId:id,amount:z.number().finite().min(0.01).max(1e7),method:paymentMethod,reference:str(120)}).parse(payload);const o=s.orders.find(o=>o.id===d.orderId);if(!o||o.status==='Cancelado')throw new DomainError('No se puede registrar un abono en ese pedido.');
+  if(!o.payments&&o.paymentStatus==='Pagado')throw new DomainError('Este pedido ya figura como pagado en el registro anterior.');
+  o.payments??=[];const amount=money(d.amount);const remaining=money(o.total-o.payments.reduce((sum,p)=>sum+p.amount,0));if(amount>remaining)throw new DomainError('El abono supera el saldo pendiente.');
+  o.payments.unshift({id:uid(),amount,method:d.method,reference:d.reference,createdAt:new Date().toISOString()});updatePaymentStatus(o);break;
+ }
+ case 'order.payment.remove':{
+  const d=z.object({orderId:id,paymentId:id}).parse(payload);const o=s.orders.find(o=>o.id===d.orderId);if(!o||!o.payments)throw new DomainError('Abono no encontrado.');const index=o.payments.findIndex(p=>p.id===d.paymentId);if(index<0)throw new DomainError('Abono no encontrado.');o.payments.splice(index,1);updatePaymentStatus(o);break;
+ }
  default:throw new DomainError('Acción no disponible.');
  }
  if(JSON.stringify(w).length>2500000)throw new DomainError('El espacio superó el tamaño permitido. Exporta los datos antes de continuar.');
  return w;
 }
+function money(value:number){return Math.round((value+Number.EPSILON)*100)/100;}
+function updatePaymentStatus(order:Order){const paid=money((order.payments||[]).reduce((sum,p)=>sum+p.amount,0));order.paymentStatus=paid<=0?'Pendiente':paid>=order.total?'Pagado':'Parcial';}
 export function simulateReply(store:Store,text:string):string {
  const t=text.toLocaleLowerCase('es');
  if(/env[ií]o|entrega|delivery/.test(t))return store.agent.shipping||'Aún no hay una política de envíos configurada. Un asesor debe confirmar el costo y la cobertura.';

@@ -15,6 +15,8 @@ Actualizado: 16 de octubre de 2026. Propietaria: Lorena Sifuentes.
 Panel para hasta cinco tiendas, con productos, stock, contactos, pedidos, métricas, configuración del vendedor, preguntas frecuentes y reglas separadas por tienda. Diseño de cristal translúcido, fondo cálido y acentos naranjas. Exportación de datos disponible.
 El servidor impide crear una sexta tienda, incluso mediante carga de ejemplos. No se eliminan datos anteriores si ya hubiera más de cinco.
 El apartado Equipo permite a la propietaria invitar hasta diez administradores mediante el correo exacto de su cuenta de ChatGPT. La invitación se activa al iniciar sesión y todos operan sobre el mismo conjunto de tiendas. Los administradores gestionan productos, clientes, pedidos y configuración, pero no pueden invitar o retirar miembros. Nexo no envía el correo de invitación: la propietaria comparte el enlace del sitio.
+El apartado Equipo también muestra actividad reciente por integrante. El registro guarda descripciones breves y evita copiar el contenido de clientes o pedidos.
+Los pedidos nuevos separan logística y pagos. Al crearlos se elige provincia con adelanto esperado del 50% o Lima con pago al recibir. Los abonos se registran manualmente después de verificarlos; Nexo calcula cobrado, saldo y estado Pendiente/Parcial/Pagado. Los pedidos anteriores marcados como pagados siguen siendo compatibles.
 El probador es una simulación por coincidencias, no una IA. WhatsApp, Instagram, Messenger, chat web, pagos externos y biblioteca documental NO están integrados.
 Datos: workspaces(owner_id, payload JSON, version, updated_at), con control de versión para evitar sobrescrituras; workspace_members relaciona los administradores con el espacio de la propietaria. Antes de escalar conversaciones, normalizar tablas y añadir cola, auditoría e idempotencia.
 
@@ -25,7 +27,7 @@ Datos: workspaces(owner_id, payload JSON, version, updated_at), con control de v
 - Falta confirmar cuándo se exige exactamente el saldo provincial, quién paga envío y cobertura de Lima/Callao.
 - No inventar cuentas bancarias, billeteras, plazos, descuentos ni tarifas.
 - Un adelanto no equivale a pago completo. Un comprobante enviado por el cliente no prueba por sí solo el abono.
-- La versión actual solo tiene Pendiente/Pagado manual: registrar adelantos y saldo como entidades separadas sigue pendiente. No marcar Pagado al recibir solo 50%.
+- Los abonos y el saldo ya se registran por separado. Todavía faltan devoluciones o reembolsos y comprobantes adjuntos. No marcar un abono como verificado sin comprobarlo fuera de Nexo.
 
 ## Agentes deseados
 Conversación natural, breve y contextual; recordar lo hablado y preguntar lo necesario. Biblioteca común de técnicas de venta y libros, junto con conocimiento específico por tienda. Recuperar fuentes relevantes, no afirmar que cargar documentos reentrena al modelo. Separar clientes por tienda; precios y stock siempre desde catálogo; aprobación humana para excepciones. No garantizar ventas ni fingir identidad humana.
@@ -36,11 +38,11 @@ Referencias: https://help.openai.com/en/articles/11369540-using-codex-with-your-
 
 ## Siguientes pasos
 1. Aclarar momento de cobro del saldo, costo de envío y cobertura.
-2. Implementar modalidad por pedido, total de productos, adelanto esperado, abonos verificados manualmente, saldo y auditoría; redondear en céntimos. Separar estados logísticos y de pago.
-3. Elegir vía de IA compatible con la restricción de costes; empezar por asistencia supervisada si no hay integración autorizada del plan.
-4. Biblioteca con archivos, extracción y recuperación por tienda; copias y borrado antes de datos reales a escala.
-5. Un canal y una tienda piloto; medir calidad, derivaciones y conversiones antes de ampliar.
-6. Añadir auditoría por miembro antes de que el equipo gestione operaciones sensibles a escala.
+2. Añadir correcciones por devolución o reembolso y, cuando exista almacenamiento de archivos, comprobantes adjuntos.
+3. Permitir importar una copia JSON, crear copias y probar recuperación antes de usar datos reales a escala.
+4. Elegir vía de IA compatible con la restricción de costes; empezar por asistencia supervisada si no hay integración autorizada del plan.
+5. Biblioteca con archivos, extracción y recuperación por tienda.
+6. Un canal y una tienda piloto; medir calidad, derivaciones y conversiones antes de ampliar.
 
 ## Validación
 Pruebas: npm test

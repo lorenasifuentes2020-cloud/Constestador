@@ -30,7 +30,8 @@ export function describeWorkspaceAction(type: string, payload: unknown): string 
     case 'modules.save': return 'Actualizó los módulos de una tienda';
     case 'order.create': return 'Registró un pedido';
     case 'order.status': return enumSummary('Cambió el estado de un pedido a', values.status);
-    case 'order.payment': return enumSummary('Cambió el pago de un pedido a', values.paymentStatus);
+    case 'order.payment.add': return 'Registró un abono verificado';
+    case 'order.payment.remove': return 'Eliminó un abono del pedido';
     default: return 'Actualizó el espacio de trabajo';
   }
 }
