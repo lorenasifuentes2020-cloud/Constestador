@@ -28,4 +28,5 @@ test('distingue altas y actualizaciones por el identificador del registro', () =
   assert.equal(describeWorkspaceAction('product.save', { name: 'Nuevo' }), 'Añadió un producto');
   assert.equal(describeWorkspaceAction('product.save', { id: 'product-1' }), 'Actualizó un producto');
   assert.equal(describeWorkspaceAction('unknown', {}), 'Actualizó el espacio de trabajo');
+  assert.equal(describeWorkspaceAction('workspace.import', { backup: { stores: [] } }), 'Restauró un respaldo del espacio');
 });

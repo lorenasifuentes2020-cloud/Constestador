@@ -28,6 +28,7 @@ export function describeWorkspaceAction(type: string, payload: unknown): string 
     case 'rule.save': return editing ? 'Actualizó una regla' : 'Añadió una regla';
     case 'promotion.save': return editing ? 'Actualizó una promoción' : 'Añadió una promoción';
     case 'modules.save': return 'Actualizó los módulos de una tienda';
+    case 'workspace.import': return 'Restauró un respaldo del espacio';
     case 'order.create': return 'Registró un pedido';
     case 'order.status': return enumSummary('Cambió el estado de un pedido a', values.status);
     case 'order.payment.add': return 'Registró un abono verificado';

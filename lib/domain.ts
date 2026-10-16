@@ -16,13 +16,48 @@ const contact=z.object({id:id.optional(),name:required(),phone:str(30),email:z.u
 const entry=z.object({id:id.optional(),title:required(200),content:required(4000),active:z.boolean()});
 const agent=z.object({name:required(80),tone:z.enum(['Cercano','Profesional','Entusiasta']),description:str(4000),greeting:str(1000),instructions:str(8000),shipping:str(3000),payments:str(3000),returns:str(3000)});
 const paymentMethod=z.enum(['Efectivo','Yape','Plin','Transferencia','Tarjeta','Otro']);
+const timestamp=z.string().datetime({offset:true});
+const storedProduct=product.extend({id});
+const storedContact=contact.extend({id});
+const storedEntry=entry.extend({id});
+const storedPayment=z.object({id,amount:z.number().finite().min(0.01).max(1e7),method:paymentMethod,reference:str(120),createdAt:timestamp});
+const storedOrder=z.object({
+ id,number:required(40),contactId:id,customer:required(),
+ items:z.array(z.object({productId:id,name:required(),quantity:z.number().int().min(1).max(10000),price:z.number().finite().min(0).max(1e7)})).min(1).max(50),
+ total:z.number().finite().min(0).max(1e9),status:z.enum(['Pendiente','Confirmado','Enviado','Entregado','Cancelado']),paymentStatus:z.enum(['Pendiente','Parcial','Pagado']),
+ paymentPlan:z.enum(['province-advance','lima-cod']).optional(),expectedAdvance:z.number().finite().min(0).max(1e9).optional(),payments:z.array(storedPayment).max(1500).optional(),
+ channel:z.enum(['Manual','WhatsApp','Instagram','Web']),createdAt:timestamp,notes:str(2000),
+});
+const storedStore=baseStore.extend({
+ id,createdAt:timestamp,demo:z.boolean(),products:z.array(storedProduct).max(1500),contacts:z.array(storedContact).max(1500),orders:z.array(storedOrder).max(1500),
+ faqs:z.array(storedEntry).max(1500),rules:z.array(storedEntry).max(1500),promotions:z.array(storedEntry).max(1500),agent,modules:z.object({wholesale:z.boolean(),advisors:z.boolean()}),
+});
+const backupDocument=z.object({formatVersion:z.literal(1).optional(),exportedAt:timestamp.optional(),stores:z.array(storedStore).max(5)});
 export const DEFAULT_PAYMENTS='Provincias fuera de Lima: adelanto del 50% del valor de los productos, envío por Shalom y pago posterior del saldo. Lima: opción de pago al recibir en casa con el motorizado. Confirmar con la tienda el momento exacto del saldo y los costos de envío. Un adelanto no es un pago completo.';
 export const DEFAULT_SHIPPING='Provincias fuera de Lima: envío por Shalom después del adelanto del 50% del valor de los productos. Lima: entrega a domicilio con motorizado y opción de pago al recibir. Confirmar cobertura, tarifa y plazos con la tienda.';
 const uid=()=>crypto.randomUUID();
 export function createStore(input:z.infer<typeof baseStore>,demo=false):Store{return {id:uid(),...input,createdAt:new Date().toISOString(),demo,products:[],contacts:[],orders:[],faqs:[],rules:[],promotions:[],agent:{name:'Asistente de '+input.name,tone:'Cercano',description:'',greeting:'¡Hola! Bienvenido a '+input.name+'. ¿En qué puedo ayudarte?',instructions:'No inventes precios ni disponibilidad. Consulta el catálogo y deriva a una persona cuando no tengas información suficiente.',shipping:DEFAULT_SHIPPING,payments:DEFAULT_PAYMENTS,returns:''},modules:{wholesale:false,advisors:false}};}
 export class DomainError extends Error {status=400;}
+export function parseWorkspaceBackup(input:unknown):Workspace {
+ const parsed=backupDocument.safeParse(input);if(!parsed.success)throw new DomainError('El archivo no tiene un formato de respaldo válido de Nexo.');
+ const workspace:Workspace={stores:parsed.data.stores};const storeIds=new Set<string>();
+ for(const store of workspace.stores){
+  if(storeIds.has(store.id))throw new DomainError('El respaldo contiene tiendas duplicadas.');storeIds.add(store.id);
+  assertUnique(store.products,'productos');assertUnique(store.contacts,'clientes');assertUnique(store.orders,'pedidos');assertUnique(store.faqs,'preguntas frecuentes');assertUnique(store.rules,'reglas');assertUnique(store.promotions,'promociones');
+  const productIds=new Set(store.products.map(item=>item.id));const contactIds=new Set(store.contacts.map(item=>item.id));
+  for(const order of store.orders){
+   if(!contactIds.has(order.contactId))throw new DomainError(`El pedido ${order.number} refiere a un cliente inexistente.`);
+   if(order.items.some(item=>!productIds.has(item.productId)))throw new DomainError(`El pedido ${order.number} refiere a un producto inexistente.`);
+   if(money(order.items.reduce((sum,item)=>sum+item.price*item.quantity,0))!==money(order.total))throw new DomainError(`El total del pedido ${order.number} no coincide con sus productos.`);
+   if(order.expectedAdvance!==undefined&&money(order.expectedAdvance)>money(order.total))throw new DomainError(`El adelanto del pedido ${order.number} supera su total.`);
+   if(order.payments){assertUnique(order.payments,'abonos');const paid=money(order.payments.reduce((sum,payment)=>sum+payment.amount,0));if(paid>money(order.total))throw new DomainError(`Los abonos del pedido ${order.number} superan su total.`);const expected=paid<=0?'Pendiente':paid>=order.total?'Pagado':'Parcial';if(order.paymentStatus!==expected)throw new DomainError(`El estado de pago del pedido ${order.number} no coincide con sus abonos.`);}
+  }
+ }
+ if(JSON.stringify(workspace).length>2500000)throw new DomainError('El respaldo supera el tamaño permitido.');return workspace;
+}
 export function mutateWorkspace(current:Workspace,type:string,payload:any):Workspace {
  const w:Workspace=structuredClone(current);
+ if(type==='workspace.import')return parseWorkspaceBackup(payload?.backup);
  if(type==='store.create'){if(w.stores.length>=5)throw new DomainError('Límite de 5 tiendas alcanzado.');w.stores.push(createStore(baseStore.parse(payload)));return w;}
  if(type==='demo.load'){
   if(w.stores.some(s=>s.demo))throw new DomainError('Ya tienes tiendas de ejemplo.');
@@ -76,6 +111,7 @@ export function mutateWorkspace(current:Workspace,type:string,payload:any):Works
  return w;
 }
 function money(value:number){return Math.round((value+Number.EPSILON)*100)/100;}
+function assertUnique(items:{id:string}[],label:string){if(new Set(items.map(item=>item.id)).size!==items.length)throw new DomainError(`El respaldo contiene ${label} duplicados.`);}
 function updatePaymentStatus(order:Order){const paid=money((order.payments||[]).reduce((sum,p)=>sum+p.amount,0));order.paymentStatus=paid<=0?'Pendiente':paid>=order.total?'Pagado':'Parcial';}
 export function simulateReply(store:Store,text:string):string {
  const t=text.toLocaleLowerCase('es');

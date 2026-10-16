@@ -5,7 +5,7 @@ Actualizado: 16 de octubre de 2026. Propietaria: Lorena Sifuentes.
 ## Proyecto existente
 - URL: https://nexo-tiendas-lorena.regallime2.chatgpt.site/
 - Proyecto Sites: appgprj_6ad237a1461481919a0687b66dd1d96b
-- Checkout en este entorno: /workspace/sites/nexo-tiendas. Esta ruta no existe automáticamente en el equipo de Lorena.
+- Checkout en este entorno: /workspace/Constestador. Esta ruta no existe automáticamente en el equipo de Lorena.
 - Reutilizar .openai/hosting.json y la identidad del proyecto; no crear otro Site.
 - React/Vinext y Cloudflare Workers; D1 DB para datos; R2 todavía deshabilitado.
 - Leer la skill Sites y obtener credenciales de repositorio efímeras por su flujo oficial. No copiar tokens a documentos.
@@ -17,8 +17,9 @@ El servidor impide crear una sexta tienda, incluso mediante carga de ejemplos. N
 El apartado Equipo permite a la propietaria invitar hasta diez administradores mediante el correo exacto de su cuenta de ChatGPT. La invitación se activa al iniciar sesión y todos operan sobre el mismo conjunto de tiendas. Los administradores gestionan productos, clientes, pedidos y configuración, pero no pueden invitar o retirar miembros. Nexo no envía el correo de invitación: la propietaria comparte el enlace del sitio.
 El apartado Equipo también muestra actividad reciente por integrante. El registro guarda descripciones breves y evita copiar el contenido de clientes o pedidos.
 Los pedidos nuevos separan logística y pagos. Al crearlos se elige provincia con adelanto esperado del 50% o Lima con pago al recibir. Los abonos se registran manualmente después de verificarlos; Nexo calcula cobrado, saldo y estado Pendiente/Parcial/Pagado. Los pedidos anteriores marcados como pagados siguen siendo compatibles.
+La exportación JSON incluye una versión de formato. La propietaria puede restaurar un respaldo completo después de revisar un resumen y escribir RESTAURAR. El servidor valida límites, duplicados, referencias entre registros, totales y abonos antes de reemplazar las tiendas. Los administradores pueden exportar, pero no restaurar todo el espacio.
 El probador es una simulación por coincidencias, no una IA. WhatsApp, Instagram, Messenger, chat web, pagos externos y biblioteca documental NO están integrados.
-Datos: workspaces(owner_id, payload JSON, version, updated_at), con control de versión para evitar sobrescrituras; workspace_members relaciona los administradores con el espacio de la propietaria. Antes de escalar conversaciones, normalizar tablas y añadir cola, auditoría e idempotencia.
+Datos: workspaces(owner_id, payload JSON, version, updated_at), con control de versión para evitar sobrescrituras; workspace_members relaciona los administradores con el espacio de la propietaria; workspace_audit_log conserva actividad breve del equipo. Antes de escalar conversaciones, normalizar tablas y añadir cola e idempotencia.
 
 ## Reglas comerciales confirmadas por Lorena
 - Provincias del Perú fuera de Lima: adelanto del 50% del valor de los productos; luego envío por Shalom; el cliente completa el saldo posteriormente.
@@ -39,7 +40,7 @@ Referencias: https://help.openai.com/en/articles/11369540-using-codex-with-your-
 ## Siguientes pasos
 1. Aclarar momento de cobro del saldo, costo de envío y cobertura.
 2. Añadir correcciones por devolución o reembolso y, cuando exista almacenamiento de archivos, comprobantes adjuntos.
-3. Permitir importar una copia JSON, crear copias y probar recuperación antes de usar datos reales a escala.
+3. Automatizar copias periódicas y definir una política de retención antes de usar datos reales a escala.
 4. Elegir vía de IA compatible con la restricción de costes; empezar por asistencia supervisada si no hay integración autorizada del plan.
 5. Biblioteca con archivos, extracción y recuperación por tienda.
 6. Un canal y una tienda piloto; medir calidad, derivaciones y conversiones antes de ampliar.

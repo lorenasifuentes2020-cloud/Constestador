@@ -86,7 +86,7 @@ export async function POST(request: Request) {
 
     const { access, db, user } = await context(request);
     const raw = await request.text();
-    if (raw.length > 100000) return json({ error: 'Solicitud demasiado grande.' }, 413);
+    if (raw.length > 2700000) return json({ error: 'Solicitud demasiado grande.' }, 413);
 
     let parsed: unknown;
     try {
@@ -100,6 +100,10 @@ export async function POST(request: Request) {
       type: z.string().max(100),
       payload: z.unknown(),
     }).parse(parsed);
+
+    if (body.type === 'workspace.import' && access.role !== 'owner') {
+      return json({ error: 'Solo la propietaria puede restaurar un respaldo completo.' }, 403);
+    }
 
     await db.prepare(
       `INSERT OR IGNORE INTO workspaces
