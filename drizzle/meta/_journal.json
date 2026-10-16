@@ -8,6 +8,13 @@
       "when": 1792162266627,
       "tag": "0000_medical_tigra",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792179207676,
+      "tag": "0001_heavy_wild_child",
+      "breakpoints": true
     }
   ]
 }

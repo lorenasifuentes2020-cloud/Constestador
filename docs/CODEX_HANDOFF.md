@@ -14,8 +14,9 @@ Actualizado: 16 de octubre de 2026. Propietaria: Lorena Sifuentes.
 ## Producto y estado real
 Panel para hasta cinco tiendas, con productos, stock, contactos, pedidos, métricas, configuración del vendedor, preguntas frecuentes y reglas separadas por tienda. Diseño de cristal translúcido, fondo cálido y acentos naranjas. Exportación de datos disponible.
 El servidor impide crear una sexta tienda, incluso mediante carga de ejemplos. No se eliminan datos anteriores si ya hubiera más de cinco.
+El apartado Equipo permite a la propietaria invitar hasta diez administradores mediante el correo exacto de su cuenta de ChatGPT. La invitación se activa al iniciar sesión y todos operan sobre el mismo conjunto de tiendas. Los administradores gestionan productos, clientes, pedidos y configuración, pero no pueden invitar o retirar miembros. Nexo no envía el correo de invitación: la propietaria comparte el enlace del sitio.
 El probador es una simulación por coincidencias, no una IA. WhatsApp, Instagram, Messenger, chat web, pagos externos y biblioteca documental NO están integrados.
-Datos: workspaces(owner_id, payload JSON, version, updated_at), con control de versión para evitar sobrescrituras. Antes de escalar conversaciones, normalizar tablas y añadir cola e idempotencia.
+Datos: workspaces(owner_id, payload JSON, version, updated_at), con control de versión para evitar sobrescrituras; workspace_members relaciona los administradores con el espacio de la propietaria. Antes de escalar conversaciones, normalizar tablas y añadir cola, auditoría e idempotencia.
 
 ## Reglas comerciales confirmadas por Lorena
 - Provincias del Perú fuera de Lima: adelanto del 50% del valor de los productos; luego envío por Shalom; el cliente completa el saldo posteriormente.
@@ -39,8 +40,9 @@ Referencias: https://help.openai.com/en/articles/11369540-using-codex-with-your-
 3. Elegir vía de IA compatible con la restricción de costes; empezar por asistencia supervisada si no hay integración autorizada del plan.
 4. Biblioteca con archivos, extracción y recuperación por tienda; copias y borrado antes de datos reales a escala.
 5. Un canal y una tienda piloto; medir calidad, derivaciones y conversiones antes de ampliar.
+6. Añadir auditoría por miembro antes de que el equipo gestione operaciones sensibles a escala.
 
 ## Validación
-Pruebas de dominio: node --experimental-strip-types --test tests/domain.test.ts
+Pruebas: npm test
 TypeScript: node node_modules/typescript/bin/tsc --noEmit
 Compilar/publicar mediante helpers Sites. No iniciar un navegador alternativo para QA si la skill no lo permite. No se ha realizado prueba de carga; no prometer capacidad de clientes simultáneos.

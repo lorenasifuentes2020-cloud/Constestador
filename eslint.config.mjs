@@ -48,6 +48,14 @@ const eslintConfig = defineConfig([
       "@next/next/no-html-link-for-pages": "off",
     },
   },
+  {
+    files: ["app/team/team-panel.tsx"],
+    rules: {
+      // This effect performs the initial remote team fetch; state updates occur
+      // only after the request settles.
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -1,0 +1,30 @@
+.entry {
+  align-items: center;
+  background: #292632;
+  border: 1px solid #514259;
+  border-radius: 999px;
+  bottom: 22px;
+  box-shadow: 0 12px 30px #211a2c2b;
+  color: #f7f0ff;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 8px;
+  padding: 11px 17px;
+  position: fixed;
+  right: 24px;
+  transition: transform 150ms ease, background 150ms ease;
+  z-index: 80;
+}
+
+.entry:hover {
+  background: #3b334a;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 700px) {
+  .entry {
+    bottom: 16px;
+    right: 16px;
+  }
+}
