@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { z } from 'zod';
-import { mutateWorkspace, DomainError, type Workspace } from '../../../lib/domain';
+import { mutateWorkspace, normalizeWorkspace, DomainError, type Workspace } from '../../../lib/domain';
 import {
   describeWorkspaceAction,
   recordWorkspaceActivity,
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
     ).bind(access.ownerId).first<{ payload: string; version: number }>();
 
     return json({
-      workspace: row ? JSON.parse(row.payload) : { stores: [] },
+      workspace: row ? normalizeWorkspace(JSON.parse(row.payload) as Workspace) : { stores: [] },
       version: row?.version ?? 0,
       access,
     });

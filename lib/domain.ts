@@ -5,7 +5,7 @@ export type Payment = {id:string;amount:number;method:string;reference:string;cr
 export type Refund = Payment;
 export type Order = {id:string;number:string;contactId:string;customer:string;items:{productId:string;name:string;quantity:number;price:number}[];total:number;status:string;paymentStatus:string;paymentPlan?:'province-advance'|'lima-cod';expectedAdvance?:number;payments?:Payment[];refunds?:Refund[];channel:string;createdAt:string;notes:string};
 export type Entry = {id:string;title:string;content:string;active:boolean};
-export type Agent = {name:string;tone:string;description:string;greeting:string;instructions:string;shipping:string;payments:string;returns:string};
+export type Agent = {name:string;tone:string;description:string;greeting:string;instructions:string;shipping:string;payments:string};
 export type Store = {id:string;name:string;category:string;color:string;createdAt:string;demo:boolean;products:Product[];contacts:Contact[];orders:Order[];faqs:Entry[];rules:Entry[];promotions:Entry[];agent:Agent;modules:{wholesale:boolean;advisors:boolean}};
 export type Workspace = {stores:Store[]};
 const str=(max=300)=>z.string().trim().max(max);
@@ -15,7 +15,7 @@ const baseStore=z.object({name:required(80),category:required(80),color:z.enum([
 const product=z.object({id:id.optional(),name:required(),sku:str(60),category:str(80),price:z.number().finite().min(0).max(1e7),stock:z.number().int().min(0).max(1e7),description:str(2000),active:z.boolean()});
 const contact=z.object({id:id.optional(),name:required(),phone:str(30),email:z.union([z.literal(''),z.string().email()]).default(''),stage:z.enum(['Nuevo','En conversación','Cliente','Inactivo']),notes:str(2000)});
 const entry=z.object({id:id.optional(),title:required(200),content:required(4000),active:z.boolean()});
-const agent=z.object({name:required(80),tone:z.enum(['Cercano','Profesional','Entusiasta']),description:str(4000),greeting:str(1000),instructions:str(8000),shipping:str(3000),payments:str(3000),returns:str(3000)});
+const agent=z.object({name:required(80),tone:z.enum(['Cercano','Profesional','Entusiasta']),description:str(4000),greeting:str(1000),instructions:str(8000),shipping:str(3000),payments:str(3000)});
 const paymentMethod=z.enum(['Efectivo','Yape','Plin','Transferencia','Tarjeta','Otro']);
 const timestamp=z.string().datetime({offset:true});
 const storedProduct=product.extend({id});
@@ -34,11 +34,14 @@ const storedStore=baseStore.extend({
  faqs:z.array(storedEntry).max(1500),rules:z.array(storedEntry).max(1500),promotions:z.array(storedEntry).max(1500),agent,modules:z.object({wholesale:z.boolean(),advisors:z.boolean()}),
 });
 const backupDocument=z.object({formatVersion:z.literal(1).optional(),exportedAt:timestamp.optional(),stores:z.array(storedStore).max(5)});
-export const DEFAULT_PAYMENTS='Provincias fuera de Lima: adelanto del 50% del valor de los productos, envío por Shalom y pago posterior del saldo. Lima: opción de pago al recibir en casa con el motorizado. Confirmar con la tienda el momento exacto del saldo y los costos de envío. Un adelanto no es un pago completo.';
-export const DEFAULT_SHIPPING='Provincias fuera de Lima: envío por Shalom después del adelanto del 50% del valor de los productos. Lima: entrega a domicilio con motorizado y opción de pago al recibir. Confirmar cobertura, tarifa y plazos con la tienda.';
+export const DEFAULT_PAYMENTS='Los pagos de Lima y provincias se registran manualmente después de verificarlos. Nexo muestra si el pago está pendiente, parcial o completado y calcula el saldo restante. No afirmar que un pago está completo sin revisar los movimientos registrados.';
+export const DEFAULT_SHIPPING='El envío está incluido en el precio del pedido. Para provincias del Perú se coordina el despacho por Shalom. Para Lima, el motorizado cubre todo Lima. Confirmar únicamente el plazo y los datos necesarios para la entrega.';
+const LEGACY_PAYMENTS='Provincias fuera de Lima: adelanto del 50% del valor de los productos, envío por Shalom y pago posterior del saldo. Lima: opción de pago al recibir en casa con el motorizado. Confirmar con la tienda el momento exacto del saldo y los costos de envío. Un adelanto no es un pago completo.';
+const LEGACY_SHIPPING='Provincias fuera de Lima: envío por Shalom después del adelanto del 50% del valor de los productos. Lima: entrega a domicilio con motorizado y opción de pago al recibir. Confirmar cobertura, tarifa y plazos con la tienda.';
 const uid=()=>crypto.randomUUID();
-export function createStore(input:z.infer<typeof baseStore>,demo=false):Store{return {id:uid(),...input,createdAt:new Date().toISOString(),demo,products:[],contacts:[],orders:[],faqs:[],rules:[],promotions:[],agent:{name:'Asistente de '+input.name,tone:'Cercano',description:'',greeting:'¡Hola! Bienvenido a '+input.name+'. ¿En qué puedo ayudarte?',instructions:'No inventes precios ni disponibilidad. Consulta el catálogo y deriva a una persona cuando no tengas información suficiente.',shipping:DEFAULT_SHIPPING,payments:DEFAULT_PAYMENTS,returns:''},modules:{wholesale:false,advisors:false}};}
+export function createStore(input:z.infer<typeof baseStore>,demo=false):Store{return {id:uid(),...input,createdAt:new Date().toISOString(),demo,products:[],contacts:[],orders:[],faqs:[],rules:[],promotions:[],agent:{name:'Asistente de '+input.name,tone:'Cercano',description:'',greeting:'¡Hola! Bienvenido a '+input.name+'. ¿En qué puedo ayudarte?',instructions:'No inventes precios ni disponibilidad. Consulta el catálogo y deriva a una persona cuando no tengas información suficiente.',shipping:DEFAULT_SHIPPING,payments:DEFAULT_PAYMENTS},modules:{wholesale:false,advisors:false}};}
 export class DomainError extends Error {status=400;}
+export function normalizeWorkspace(input:Workspace):Workspace {const workspace=structuredClone(input);for(const store of workspace.stores){if(store.agent.payments===LEGACY_PAYMENTS)store.agent.payments=DEFAULT_PAYMENTS;if(store.agent.shipping===LEGACY_SHIPPING||store.agent.shipping==='Envíos de ejemplo a Lima y provincias. Confirmar cobertura y costo antes de cerrar el pedido.')store.agent.shipping=DEFAULT_SHIPPING;delete (store.agent as Agent&{returns?:string}).returns;}return workspace;}
 export function parseWorkspaceBackup(input:unknown):Workspace {
  const parsed=backupDocument.safeParse(input);if(!parsed.success)throw new DomainError('El archivo no tiene un formato de respaldo válido de Nexo.');
  const workspace:Workspace={stores:parsed.data.stores};const storeIds=new Set<string>();
@@ -55,10 +58,10 @@ export function parseWorkspaceBackup(input:unknown):Workspace {
    else if(order.refunds?.length)throw new DomainError(`El pedido ${order.number} tiene reembolsos sin abonos detallados.`);
   }
  }
- if(JSON.stringify(workspace).length>2500000)throw new DomainError('El respaldo supera el tamaño permitido.');return workspace;
+ if(JSON.stringify(workspace).length>2500000)throw new DomainError('El respaldo supera el tamaño permitido.');return normalizeWorkspace(workspace);
 }
 export function mutateWorkspace(current:Workspace,type:string,payload:any):Workspace {
- const w:Workspace=structuredClone(current);
+ const w=normalizeWorkspace(current);
  if(type==='workspace.import')return parseWorkspaceBackup(payload?.backup);
  if(type==='store.create'){if(w.stores.length>=5)throw new DomainError('Límite de 5 tiendas alcanzado.');w.stores.push(createStore(baseStore.parse(payload)));return w;}
  if(type==='demo.load'){
@@ -68,7 +71,7 @@ export function mutateWorkspace(current:Workspace,type:string,payload:any):Works
    ['Luna Studio','Moda y accesorios','plum',[['Blusa Alba','BL-001',89,24],['Bolso Arena','BO-001',139,12],['Vestido Aurora','VE-001',159,8]]],
    ['Nativa Beauty','Belleza y cuidado','green',[['Sérum Botánico','SE-001',69,32],['Crema Hidratante','CR-001',49,18]]],
    ['Casa Nube','Hogar y decoración','orange',[['Lámpara Nube','LA-001',189,5],['Jarrón Tierra','JA-001',79,14]]]
-  ] as any[]){const s=createStore({name:n,category:c,color:col},true);s.products=items.map((x:any)=>({id:uid(),name:x[0],sku:x[1],price:x[2],stock:x[3],category:c,description:'Producto de ejemplo para explorar el sistema.',active:true}));s.contacts=[{id:uid(),name:'Cliente de ejemplo',phone:'',email:'',stage:'Nuevo',notes:'Datos ficticios. Puedes crear tus propios contactos.'}];s.agent.shipping='Envíos de ejemplo a Lima y provincias. Confirmar cobertura y costo antes de cerrar el pedido.';w.stores.push(s);}
+  ] as any[]){const s=createStore({name:n,category:c,color:col},true);s.products=items.map((x:any)=>({id:uid(),name:x[0],sku:x[1],price:x[2],stock:x[3],category:c,description:'Producto de ejemplo para explorar el sistema.',active:true}));s.contacts=[{id:uid(),name:'Cliente de ejemplo',phone:'',email:'',stage:'Nuevo',notes:'Datos ficticios. Puedes crear tus propios contactos.'}];w.stores.push(s);}
   return w;
  }
  const storeId=id.parse(payload.storeId);const s=w.stores.find(s=>s.id===storeId);if(!s)throw new DomainError('La tienda no existe o no pertenece a tu espacio.');
@@ -89,8 +92,7 @@ export function mutateWorkspace(current:Workspace,type:string,payload:any):Works
   const lines=Array.from(quantities,([productId,quantity])=>{const p=s.products.find(p=>p.id===productId&&p.active);if(!p)throw new DomainError('Producto no disponible en esta tienda.');if(p.stock<quantity)throw new DomainError('Stock insuficiente para '+p.name+'.');return {productId,name:p.name,quantity,price:p.price};});
   for(const l of lines)s.products.find(p=>p.id===l.productId)!.stock-=l.quantity;
   const total=Math.round(lines.reduce((a,l)=>a+l.price*l.quantity,0)*100)/100;
-  const expectedAdvance=o.paymentPlan==='province-advance'?money(total/2):0;
-  s.orders.unshift({id:uid(),number:'NX-'+String(s.orders.length+1).padStart(4,'0'),contactId:c.id,customer:c.name,items:lines,total,status:'Pendiente',paymentStatus:'Pendiente',paymentPlan:o.paymentPlan,expectedAdvance,payments:[],refunds:[],channel:o.channel,createdAt:new Date().toISOString(),notes:o.notes});c.stage='Cliente';break;
+  s.orders.unshift({id:uid(),number:'NX-'+String(s.orders.length+1).padStart(4,'0'),contactId:c.id,customer:c.name,items:lines,total,status:'Pendiente',paymentStatus:'Pendiente',paymentPlan:o.paymentPlan,payments:[],refunds:[],channel:o.channel,createdAt:new Date().toISOString(),notes:o.notes});c.stage='Cliente';break;
  }
  case 'order.status':{
   const d=z.object({orderId:id,status:z.enum(['Pendiente','Confirmado','Enviado','Entregado','Cancelado'])}).parse(payload);const o=s.orders.find(o=>o.id===d.orderId);if(!o)throw new DomainError('Pedido no encontrado.');
@@ -122,15 +124,3 @@ function money(value:number){return Math.round((value+Number.EPSILON)*100)/100;}
 function assertUnique(items:{id:string}[],label:string){if(new Set(items.map(item=>item.id)).size!==items.length)throw new DomainError(`El respaldo contiene ${label} duplicados.`);}
 function netPaid(order:Order){return money((order.payments||[]).reduce((sum,p)=>sum+p.amount,0)-(order.refunds||[]).reduce((sum,r)=>sum+r.amount,0));}
 function updatePaymentStatus(order:Order){const paid=netPaid(order);order.paymentStatus=paid<=0?'Pendiente':paid>=order.total?'Pagado':'Parcial';}
-export function simulateReply(store:Store,text:string):string {
- const t=text.toLocaleLowerCase('es');
- if(/env[ií]o|entrega|delivery/.test(t))return store.agent.shipping||'Aún no hay una política de envíos configurada. Un asesor debe confirmar el costo y la cobertura.';
- if(/pago|yape|plin|tarjeta/.test(t))return store.agent.payments||'Aún no hay métodos de pago configurados. Consulta con un asesor antes de pagar.';
- if(/devol|cambio/.test(t))return store.agent.returns||'Un asesor debe confirmar la política de cambios y devoluciones.';
- for(const f of store.faqs.filter(f=>f.active)){if(f.title.toLowerCase().split(/\W+/).filter(x=>x.length>3).some(x=>t.includes(x)))return f.content;}
- const p=store.products.find(p=>p.active&&(t.includes(p.name.toLowerCase())||(p.sku&&t.includes(p.sku.toLowerCase()))));
- if(p)return p.stock>0?`${p.name}: S/ ${p.price.toFixed(2)}. Stock registrado: ${p.stock}. ${p.description}`:`${p.name} está agotado según el catálogo.`;
- if(/cat[aá]logo|producto|precio/.test(t)){const ps=store.products.filter(p=>p.active).slice(0,6);return ps.length?ps.map(p=>`${p.name} · S/ ${p.price.toFixed(2)} · ${p.stock>0?'Disponible':'Agotado'}`).join('\n'):'Tu catálogo aún está vacío. Agrega productos para probar esta respuesta.';}
- if(/hola|buenas|buenos/.test(t))return store.agent.greeting;
- return 'Esta prueba solo usa coincidencias con el catálogo y las preguntas frecuentes. Para responder libremente hay que conectar un modelo de IA. Un asesor debe atender esta consulta.';
-}

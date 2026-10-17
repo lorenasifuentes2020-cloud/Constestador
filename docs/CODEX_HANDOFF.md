@@ -1,6 +1,6 @@
 # Nexo — continuidad en Codex
 
-Actualizado: 16 de octubre de 2026. Propietaria: Lorena Sifuentes.
+Actualizado: 17 de octubre de 2026. Propietaria: Lorena Sifuentes.
 
 ## Proyecto existente
 - URL: https://nexo-tiendas-lorena.regallime2.chatgpt.site/
@@ -16,32 +16,31 @@ Panel para hasta cinco tiendas, con productos, stock, contactos, pedidos, métri
 El servidor impide crear una sexta tienda, incluso mediante carga de ejemplos. No se eliminan datos anteriores si ya hubiera más de cinco.
 El apartado Equipo permite a la propietaria invitar hasta diez administradores mediante el correo exacto de su cuenta de ChatGPT. La invitación se activa al iniciar sesión y todos operan sobre el mismo conjunto de tiendas. Los administradores gestionan productos, clientes, pedidos y configuración, pero no pueden invitar o retirar miembros. Nexo no envía el correo de invitación: la propietaria comparte el enlace del sitio.
 El apartado Equipo también muestra actividad reciente por integrante. El registro guarda descripciones breves y evita copiar el contenido de clientes o pedidos.
-Los pedidos nuevos separan logística y pagos. Al crearlos se elige provincia con adelanto esperado del 50% o Lima con pago al recibir. Los abonos se registran manualmente después de verificarlos; Nexo calcula cobrado, saldo y estado Pendiente/Parcial/Pagado. Los pedidos anteriores marcados como pagados siguen siendo compatibles.
+Los pedidos nuevos separan logística y pagos. Al crearlos se elige Lima o provincia y luego se registran manualmente los pagos verificados. Nexo calcula cobrado, saldo y muestra las etiquetas Pago pendiente/Pago parcial/Pago completado. Los pedidos anteriores marcados como pagados siguen siendo compatibles.
 La exportación JSON incluye una versión de formato. La propietaria puede restaurar un respaldo completo después de revisar un resumen y escribir RESTAURAR. El servidor valida límites, duplicados, referencias entre registros, totales y abonos antes de reemplazar las tiendas. Los administradores pueden exportar, pero no restaurar todo el espacio.
-El probador es una simulación por coincidencias, no una IA. WhatsApp, Instagram, Messenger, chat web, pagos externos y biblioteca documental NO están integrados.
+El probador ya está preparado para consultar Gemini desde el servidor y solo funciona cuando el entorno tiene `GEMINI_API_KEY`. Envía catálogo activo, configuración de la tienda e historial breve; no envía clientes, pedidos ni pagos. WhatsApp, Instagram, Messenger, chat web, pagos externos y biblioteca documental NO están integrados.
 Datos: workspaces(owner_id, payload JSON, version, updated_at), con control de versión para evitar sobrescrituras; workspace_members relaciona los administradores con el espacio de la propietaria; workspace_audit_log conserva actividad breve del equipo. Antes de escalar conversaciones, normalizar tablas y añadir cola e idempotencia.
 
 ## Reglas comerciales confirmadas por Lorena
-- Provincias del Perú fuera de Lima: adelanto del 50% del valor de los productos; luego envío por Shalom; el cliente completa el saldo posteriormente.
-- Lima: ofrecer pago al recibir el producto en casa con el motorizado.
+- Los pagos de Lima y provincias se registran manualmente; Nexo calcula el saldo y etiqueta el pago como pendiente, parcial o completado.
+- El envío está incluido en el precio del pedido. Provincias se coordinan por Shalom y el motorizado cubre todo Lima.
 - No asumir que Shalom recauda dinero, libera paquetes o verifica pagos por API.
-- Falta confirmar cuándo se exige exactamente el saldo provincial, quién paga envío y cobertura de Lima/Callao.
 - No inventar cuentas bancarias, billeteras, plazos, descuentos ni tarifas.
-- Un adelanto no equivale a pago completo. Un comprobante enviado por el cliente no prueba por sí solo el abono.
-- Los abonos y reembolsos se conservan como movimientos separados. El cobro neto, el saldo y el estado de pago se recalculan automáticamente. Todavía faltan devoluciones de productos y comprobantes adjuntos. No marcar un movimiento como verificado sin comprobarlo fuera de Nexo.
+- Un comprobante enviado por el cliente no prueba por sí solo el pago.
+- Los pagos y reembolsos se conservan como movimientos separados. El cobro neto, el saldo y el estado de pago se recalculan automáticamente. Todavía faltan comprobantes adjuntos. No marcar un movimiento como verificado sin comprobarlo fuera de Nexo.
+- No mostrar ni inventar condiciones para cambios y devoluciones.
 
 ## Agentes deseados
 Conversación natural, breve y contextual; recordar lo hablado y preguntar lo necesario. Biblioteca común de técnicas de venta y libros, junto con conocimiento específico por tienda. Recuperar fuentes relevantes, no afirmar que cargar documentos reentrena al modelo. Separar clientes por tienda; precios y stock siempre desde catálogo; aprobación humana para excepciones. No garantizar ventas ni fingir identidad humana.
 
-## Restricción de costes
-Lorena NO quiere usar la API de ChatGPT/OpenAI. No conectar proveedores facturados ni configurar pagos sin nueva instrucción. Puede usar Codex con su suscripción y sus límites. La documentación oficial de octubre de 2026 también contempla uso del plan en aplicaciones participantes; Nexo no tiene esa integración ni elegibilidad verificada. Iniciar sesión con ChatGPT no implica compartir el cupo del plan. No usar cookies/tokens de sesión como una API improvisada.
-Referencias: https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan y https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites
+## Modelo de IA y costes
+Lorena eligió Gemini como cerebro del vendedor y no quiere usar la API de ChatGPT/OpenAI. La integración usa una clave de Google AI Studio guardada como secreto del servidor y un modelo configurable, inicialmente `gemini-3.1-pro-preview` con nivel de razonamiento alto. La disponibilidad, cuota gratuita y facturación dependen de la cuenta y del modelo habilitado en Google; comprobarlas antes del piloto. Iniciar sesión con ChatGPT se usa para identidad y administración, no aporta cuota de Gemini.
 
 ## Siguientes pasos
-1. Aclarar momento de cobro del saldo, costo de envío y cobertura.
-2. Añadir devoluciones de productos con reposición controlada de stock y, cuando exista almacenamiento de archivos, comprobantes adjuntos.
+1. Añadir comprobantes adjuntos cuando exista almacenamiento de archivos.
+2. Añadir la clave de Google AI Studio, confirmar que `gemini-3.1-pro-preview` está habilitado y probar sus límites.
 3. Automatizar copias periódicas y definir una política de retención antes de usar datos reales a escala.
-4. Elegir vía de IA compatible con la restricción de costes; empezar por asistencia supervisada si no hay integración autorizada del plan.
+4. Validar cuotas y facturación de Gemini en la cuenta de Google AI Studio antes del piloto.
 5. Biblioteca con archivos, extracción y recuperación por tienda.
 6. Un canal y una tienda piloto; medir calidad, derivaciones y conversiones antes de ampliar.
 
