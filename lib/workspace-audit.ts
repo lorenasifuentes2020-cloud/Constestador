@@ -33,6 +33,8 @@ export function describeWorkspaceAction(type: string, payload: unknown): string 
     case 'order.status': return enumSummary('Cambió el estado de un pedido a', values.status);
     case 'order.payment.add': return 'Registró un abono verificado';
     case 'order.payment.remove': return 'Eliminó un abono del pedido';
+    case 'order.refund.add': return 'Registró un reembolso';
+    case 'order.refund.remove': return 'Eliminó un reembolso del pedido';
     default: return 'Actualizó el espacio de trabajo';
   }
 }

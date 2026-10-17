@@ -28,7 +28,7 @@ Datos: workspaces(owner_id, payload JSON, version, updated_at), con control de v
 - Falta confirmar cuándo se exige exactamente el saldo provincial, quién paga envío y cobertura de Lima/Callao.
 - No inventar cuentas bancarias, billeteras, plazos, descuentos ni tarifas.
 - Un adelanto no equivale a pago completo. Un comprobante enviado por el cliente no prueba por sí solo el abono.
-- Los abonos y el saldo ya se registran por separado. Todavía faltan devoluciones o reembolsos y comprobantes adjuntos. No marcar un abono como verificado sin comprobarlo fuera de Nexo.
+- Los abonos y reembolsos se conservan como movimientos separados. El cobro neto, el saldo y el estado de pago se recalculan automáticamente. Todavía faltan devoluciones de productos y comprobantes adjuntos. No marcar un movimiento como verificado sin comprobarlo fuera de Nexo.
 
 ## Agentes deseados
 Conversación natural, breve y contextual; recordar lo hablado y preguntar lo necesario. Biblioteca común de técnicas de venta y libros, junto con conocimiento específico por tienda. Recuperar fuentes relevantes, no afirmar que cargar documentos reentrena al modelo. Separar clientes por tienda; precios y stock siempre desde catálogo; aprobación humana para excepciones. No garantizar ventas ni fingir identidad humana.
@@ -39,7 +39,7 @@ Referencias: https://help.openai.com/en/articles/11369540-using-codex-with-your-
 
 ## Siguientes pasos
 1. Aclarar momento de cobro del saldo, costo de envío y cobertura.
-2. Añadir correcciones por devolución o reembolso y, cuando exista almacenamiento de archivos, comprobantes adjuntos.
+2. Añadir devoluciones de productos con reposición controlada de stock y, cuando exista almacenamiento de archivos, comprobantes adjuntos.
 3. Automatizar copias periódicas y definir una política de retención antes de usar datos reales a escala.
 4. Elegir vía de IA compatible con la restricción de costes; empezar por asistencia supervisada si no hay integración autorizada del plan.
 5. Biblioteca con archivos, extracción y recuperación por tienda.

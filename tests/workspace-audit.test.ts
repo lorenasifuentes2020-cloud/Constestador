@@ -22,6 +22,10 @@ test('incluye estados permitidos y usa un texto seguro para valores extraños', 
     describeWorkspaceAction('order.payment.add', { amount: 50, reference: '<script>' }),
     'Registró un abono verificado',
   );
+  assert.equal(
+    describeWorkspaceAction('order.refund.add', { amount: 20, reference: '<script>' }),
+    'Registró un reembolso',
+  );
 });
 
 test('distingue altas y actualizaciones por el identificador del registro', () => {

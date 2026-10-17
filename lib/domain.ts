@@ -2,7 +2,8 @@ import { z } from 'zod';
 export type Product = {id:string;name:string;sku:string;category:string;price:number;stock:number;description:string;active:boolean};
 export type Contact = {id:string;name:string;phone:string;email:string;stage:string;notes:string};
 export type Payment = {id:string;amount:number;method:string;reference:string;createdAt:string};
-export type Order = {id:string;number:string;contactId:string;customer:string;items:{productId:string;name:string;quantity:number;price:number}[];total:number;status:string;paymentStatus:string;paymentPlan?:'province-advance'|'lima-cod';expectedAdvance?:number;payments?:Payment[];channel:string;createdAt:string;notes:string};
+export type Refund = Payment;
+export type Order = {id:string;number:string;contactId:string;customer:string;items:{productId:string;name:string;quantity:number;price:number}[];total:number;status:string;paymentStatus:string;paymentPlan?:'province-advance'|'lima-cod';expectedAdvance?:number;payments?:Payment[];refunds?:Refund[];channel:string;createdAt:string;notes:string};
 export type Entry = {id:string;title:string;content:string;active:boolean};
 export type Agent = {name:string;tone:string;description:string;greeting:string;instructions:string;shipping:string;payments:string;returns:string};
 export type Store = {id:string;name:string;category:string;color:string;createdAt:string;demo:boolean;products:Product[];contacts:Contact[];orders:Order[];faqs:Entry[];rules:Entry[];promotions:Entry[];agent:Agent;modules:{wholesale:boolean;advisors:boolean}};
@@ -25,7 +26,7 @@ const storedOrder=z.object({
  id,number:required(40),contactId:id,customer:required(),
  items:z.array(z.object({productId:id,name:required(),quantity:z.number().int().min(1).max(10000),price:z.number().finite().min(0).max(1e7)})).min(1).max(50),
  total:z.number().finite().min(0).max(1e9),status:z.enum(['Pendiente','Confirmado','Enviado','Entregado','Cancelado']),paymentStatus:z.enum(['Pendiente','Parcial','Pagado']),
- paymentPlan:z.enum(['province-advance','lima-cod']).optional(),expectedAdvance:z.number().finite().min(0).max(1e9).optional(),payments:z.array(storedPayment).max(1500).optional(),
+ paymentPlan:z.enum(['province-advance','lima-cod']).optional(),expectedAdvance:z.number().finite().min(0).max(1e9).optional(),payments:z.array(storedPayment).max(1500).optional(),refunds:z.array(storedPayment).max(1500).optional(),
  channel:z.enum(['Manual','WhatsApp','Instagram','Web']),createdAt:timestamp,notes:str(2000),
 });
 const storedStore=baseStore.extend({
@@ -50,7 +51,8 @@ export function parseWorkspaceBackup(input:unknown):Workspace {
    if(order.items.some(item=>!productIds.has(item.productId)))throw new DomainError(`El pedido ${order.number} refiere a un producto inexistente.`);
    if(money(order.items.reduce((sum,item)=>sum+item.price*item.quantity,0))!==money(order.total))throw new DomainError(`El total del pedido ${order.number} no coincide con sus productos.`);
    if(order.expectedAdvance!==undefined&&money(order.expectedAdvance)>money(order.total))throw new DomainError(`El adelanto del pedido ${order.number} supera su total.`);
-   if(order.payments){assertUnique(order.payments,'abonos');const paid=money(order.payments.reduce((sum,payment)=>sum+payment.amount,0));if(paid>money(order.total))throw new DomainError(`Los abonos del pedido ${order.number} superan su total.`);const expected=paid<=0?'Pendiente':paid>=order.total?'Pagado':'Parcial';if(order.paymentStatus!==expected)throw new DomainError(`El estado de pago del pedido ${order.number} no coincide con sus abonos.`);}
+   if(order.payments){assertUnique(order.payments,'abonos');assertUnique(order.refunds||[],'reembolsos');const gross=money(order.payments.reduce((sum,payment)=>sum+payment.amount,0));const refunded=money((order.refunds||[]).reduce((sum,refund)=>sum+refund.amount,0));if(refunded>gross)throw new DomainError(`Los reembolsos del pedido ${order.number} superan lo cobrado.`);const paid=money(gross-refunded);if(paid>money(order.total))throw new DomainError(`El cobro neto del pedido ${order.number} supera su total.`);const expected=paid<=0?'Pendiente':paid>=order.total?'Pagado':'Parcial';if(order.paymentStatus!==expected)throw new DomainError(`El estado de pago del pedido ${order.number} no coincide con sus movimientos.`);}
+   else if(order.refunds?.length)throw new DomainError(`El pedido ${order.number} tiene reembolsos sin abonos detallados.`);
   }
  }
  if(JSON.stringify(workspace).length>2500000)throw new DomainError('El respaldo supera el tamaño permitido.');return workspace;
@@ -88,7 +90,7 @@ export function mutateWorkspace(current:Workspace,type:string,payload:any):Works
   for(const l of lines)s.products.find(p=>p.id===l.productId)!.stock-=l.quantity;
   const total=Math.round(lines.reduce((a,l)=>a+l.price*l.quantity,0)*100)/100;
   const expectedAdvance=o.paymentPlan==='province-advance'?money(total/2):0;
-  s.orders.unshift({id:uid(),number:'NX-'+String(s.orders.length+1).padStart(4,'0'),contactId:c.id,customer:c.name,items:lines,total,status:'Pendiente',paymentStatus:'Pendiente',paymentPlan:o.paymentPlan,expectedAdvance,payments:[],channel:o.channel,createdAt:new Date().toISOString(),notes:o.notes});c.stage='Cliente';break;
+  s.orders.unshift({id:uid(),number:'NX-'+String(s.orders.length+1).padStart(4,'0'),contactId:c.id,customer:c.name,items:lines,total,status:'Pendiente',paymentStatus:'Pendiente',paymentPlan:o.paymentPlan,expectedAdvance,payments:[],refunds:[],channel:o.channel,createdAt:new Date().toISOString(),notes:o.notes});c.stage='Cliente';break;
  }
  case 'order.status':{
   const d=z.object({orderId:id,status:z.enum(['Pendiente','Confirmado','Enviado','Entregado','Cancelado'])}).parse(payload);const o=s.orders.find(o=>o.id===d.orderId);if(!o)throw new DomainError('Pedido no encontrado.');
@@ -99,11 +101,17 @@ export function mutateWorkspace(current:Workspace,type:string,payload:any):Works
  case 'order.payment.add':{
   const d=z.object({orderId:id,amount:z.number().finite().min(0.01).max(1e7),method:paymentMethod,reference:str(120)}).parse(payload);const o=s.orders.find(o=>o.id===d.orderId);if(!o||o.status==='Cancelado')throw new DomainError('No se puede registrar un abono en ese pedido.');
   if(!o.payments&&o.paymentStatus==='Pagado')throw new DomainError('Este pedido ya figura como pagado en el registro anterior.');
-  o.payments??=[];const amount=money(d.amount);const remaining=money(o.total-o.payments.reduce((sum,p)=>sum+p.amount,0));if(amount>remaining)throw new DomainError('El abono supera el saldo pendiente.');
+  o.payments??=[];o.refunds??=[];const amount=money(d.amount);const remaining=money(o.total-netPaid(o));if(amount>remaining)throw new DomainError('El abono supera el saldo pendiente.');
   o.payments.unshift({id:uid(),amount,method:d.method,reference:d.reference,createdAt:new Date().toISOString()});updatePaymentStatus(o);break;
  }
  case 'order.payment.remove':{
-  const d=z.object({orderId:id,paymentId:id}).parse(payload);const o=s.orders.find(o=>o.id===d.orderId);if(!o||!o.payments)throw new DomainError('Abono no encontrado.');const index=o.payments.findIndex(p=>p.id===d.paymentId);if(index<0)throw new DomainError('Abono no encontrado.');o.payments.splice(index,1);updatePaymentStatus(o);break;
+  const d=z.object({orderId:id,paymentId:id}).parse(payload);const o=s.orders.find(o=>o.id===d.orderId);if(!o||!o.payments)throw new DomainError('Abono no encontrado.');const index=o.payments.findIndex(p=>p.id===d.paymentId);if(index<0)throw new DomainError('Abono no encontrado.');const nextGross=money(o.payments.reduce((sum,p)=>sum+p.amount,0)-o.payments[index].amount);const refunded=money((o.refunds||[]).reduce((sum,r)=>sum+r.amount,0));if(refunded>nextGross)throw new DomainError('Primero elimina o corrige los reembolsos asociados.');o.payments.splice(index,1);updatePaymentStatus(o);break;
+ }
+ case 'order.refund.add':{
+  const d=z.object({orderId:id,amount:z.number().finite().min(0.01).max(1e7),method:paymentMethod,reference:str(120)}).parse(payload);const o=s.orders.find(o=>o.id===d.orderId);if(!o||!o.payments?.length)throw new DomainError('No hay abonos detallados que se puedan reembolsar.');o.refunds??=[];const amount=money(d.amount);if(amount>netPaid(o))throw new DomainError('El reembolso supera el cobro neto disponible.');o.refunds.unshift({id:uid(),amount,method:d.method,reference:d.reference,createdAt:new Date().toISOString()});updatePaymentStatus(o);break;
+ }
+ case 'order.refund.remove':{
+  const d=z.object({orderId:id,refundId:id}).parse(payload);const o=s.orders.find(o=>o.id===d.orderId);if(!o||!o.refunds)throw new DomainError('Reembolso no encontrado.');const index=o.refunds.findIndex(r=>r.id===d.refundId);if(index<0)throw new DomainError('Reembolso no encontrado.');const nextRefunded=money(o.refunds.reduce((sum,r)=>sum+r.amount,0)-o.refunds[index].amount);const gross=money((o.payments||[]).reduce((sum,p)=>sum+p.amount,0));if(money(gross-nextRefunded)>money(o.total))throw new DomainError('No se puede eliminar: el cobro neto superaría el total del pedido.');o.refunds.splice(index,1);updatePaymentStatus(o);break;
  }
  default:throw new DomainError('Acción no disponible.');
  }
@@ -112,7 +120,8 @@ export function mutateWorkspace(current:Workspace,type:string,payload:any):Works
 }
 function money(value:number){return Math.round((value+Number.EPSILON)*100)/100;}
 function assertUnique(items:{id:string}[],label:string){if(new Set(items.map(item=>item.id)).size!==items.length)throw new DomainError(`El respaldo contiene ${label} duplicados.`);}
-function updatePaymentStatus(order:Order){const paid=money((order.payments||[]).reduce((sum,p)=>sum+p.amount,0));order.paymentStatus=paid<=0?'Pendiente':paid>=order.total?'Pagado':'Parcial';}
+function netPaid(order:Order){return money((order.payments||[]).reduce((sum,p)=>sum+p.amount,0)-(order.refunds||[]).reduce((sum,r)=>sum+r.amount,0));}
+function updatePaymentStatus(order:Order){const paid=netPaid(order);order.paymentStatus=paid<=0?'Pendiente':paid>=order.total?'Pagado':'Parcial';}
 export function simulateReply(store:Store,text:string):string {
  const t=text.toLocaleLowerCase('es');
  if(/env[ií]o|entrega|delivery/.test(t))return store.agent.shipping||'Aún no hay una política de envíos configurada. Un asesor debe confirmar el costo y la cobertura.';
