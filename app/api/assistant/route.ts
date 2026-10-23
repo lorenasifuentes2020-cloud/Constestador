@@ -4,8 +4,8 @@ import { normalizeWorkspace, type Workspace } from '../../../lib/domain';
 import {
   ASSISTANT_PROVIDER_LABELS,
   AssistantProviderError,
+  assistantProviderConfigs,
   generateAssistantReply,
-  type AssistantProviderConfigs,
 } from '../../../lib/assistant-providers';
 import {
   resolveWorkspaceAccess,
@@ -40,7 +40,7 @@ function failure(error: unknown) {
 export async function GET() {
   const user = await getChatGPTUser();
   if (!user) return json({ error: 'Inicia sesión para revisar los motores de IA.' }, 401);
-  const providers = providerConfigs();
+  const providers = assistantProviderConfigs(env);
   return json({
     providers: Object.fromEntries(Object.entries(providers).map(([key, config]) => [key, {
       configured: Boolean(config.apiKey),
@@ -48,23 +48,6 @@ export async function GET() {
       label: ASSISTANT_PROVIDER_LABELS[key as keyof typeof ASSISTANT_PROVIDER_LABELS],
     }])),
   });
-}
-
-function providerConfigs(): AssistantProviderConfigs {
-  return {
-    gemini: {
-      apiKey: env.GEMINI_API_KEY,
-      model: env.GEMINI_MODEL || 'gemini-3.1-pro-preview',
-    },
-    anthropic: {
-      apiKey: env.ANTHROPIC_API_KEY,
-      model: env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
-    },
-    openai: {
-      apiKey: env.NEXO_OPENAI_API_KEY,
-      model: env.NEXO_OPENAI_MODEL || 'gpt-5.4',
-    },
-  };
 }
 
 export async function POST(request: Request) {
@@ -102,7 +85,7 @@ export async function POST(request: Request) {
     if (!store) return json({ error: 'La tienda no existe o no pertenece a tu espacio.' }, 404);
 
     const provider = store.agent.provider || 'gemini';
-    const configs = providerConfigs();
+    const configs = assistantProviderConfigs(env);
     const reply = await generateAssistantReply({
       provider,
       configs,

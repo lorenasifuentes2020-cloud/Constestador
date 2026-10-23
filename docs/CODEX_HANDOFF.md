@@ -19,8 +19,8 @@ El apartado Equipo también muestra actividad reciente por integrante. El regist
 Los pedidos nuevos separan logística y pagos. Al crearlos se elige Lima o provincia y luego se registran manualmente los pagos verificados. Nexo calcula cobrado, saldo y muestra las etiquetas Pago pendiente/Pago parcial/Pago completado. Los pedidos anteriores marcados como pagados siguen siendo compatibles.
 La exportación JSON incluye una versión de formato. La propietaria puede restaurar un respaldo completo después de revisar un resumen y escribir RESTAURAR. El servidor valida límites, duplicados, referencias entre registros, totales y abonos antes de reemplazar las tiendas. Los administradores pueden exportar, pero no restaurar todo el espacio.
 El probador ya admite tres proveedores seleccionables por tienda: Gemini (`GEMINI_API_KEY`), Claude (`ANTHROPIC_API_KEY`) y ChatGPT mediante la API de OpenAI (`NEXO_OPENAI_API_KEY`). Envía catálogo activo, configuración de la tienda e historial breve; no envía clientes, pedidos ni pagos. Las claves viven solo como secretos del servidor.
-La bandeja de conversaciones ya tiene almacenamiento normalizado, historial, estados abierta/esperando/cerrada, respuestas del equipo y transferencia entre atención humana e IA. Por ahora permite registrar manualmente una consulta y probar el flujo interno. WhatsApp, Instagram, Messenger y chat web todavía no reciben ni envían mensajes reales; también siguen pendientes pagos externos y biblioteca documental.
-Datos: workspaces(owner_id, payload JSON, version, updated_at), con control de versión para evitar sobrescrituras; workspace_members relaciona los administradores con el espacio de la propietaria; workspace_audit_log conserva actividad breve del equipo; conversations y conversation_messages guardan la bandeja sin mezclar espacios. Antes de conectar canales a escala, añadir cola, idempotencia, límites por origen y política de retención.
+La bandeja de conversaciones ya tiene almacenamiento normalizado, historial, estados abierta/esperando/cerrada, respuestas del equipo y transferencia entre atención humana e IA. Cada tienda puede activar un enlace de chat web público. Los visitantes reciben respuestas del proveedor elegido; si falta la clave o la IA falla, la conversación se conserva y pasa al equipo. El navegador consulta periódicamente las respuestas humanas. WhatsApp, Instagram y Messenger todavía no reciben ni envían mensajes reales; también siguen pendientes pagos externos y biblioteca documental.
+Datos: workspaces(owner_id, payload JSON, version, updated_at), con control de versión para evitar sobrescrituras; workspace_members relaciona los administradores con el espacio de la propietaria; workspace_audit_log conserva actividad breve del equipo; conversations y conversation_messages guardan la bandeja sin mezclar espacios; public_store_channels controla enlaces públicos revocables. Antes de conectar canales a escala, añadir cola, idempotencia, límites distribuidos por origen y política de retención.
 
 ## Reglas comerciales confirmadas por Lorena
 - Los pagos de Lima y provincias se registran manualmente; Nexo calcula el saldo y etiqueta el pago como pendiente, parcial o completado.
@@ -43,7 +43,7 @@ Lorena decidió que cada tienda pueda elegir entre Gemini, Claude o ChatGPT. Los
 3. Automatizar copias periódicas y definir una política de retención antes de usar datos reales a escala.
 4. Validar cuotas y facturación de cada proveedor que se vaya a habilitar antes del piloto.
 5. Biblioteca con archivos, extracción y recuperación por tienda.
-6. Conectar el chat web como primer canal a la bandeja existente; medir calidad, derivaciones y conversiones antes de ampliar.
+6. Publicar el chat web en una tienda piloto; medir calidad, derivaciones y conversiones antes de ampliar.
 
 ## Validación
 Pruebas: npm test

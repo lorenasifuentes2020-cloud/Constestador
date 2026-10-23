@@ -15,6 +15,32 @@ export type AssistantProviderConfig = {
 
 export type AssistantProviderConfigs = Record<AssistantProvider, AssistantProviderConfig>;
 
+export type AssistantProviderEnvironment = {
+  GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
+  ANTHROPIC_API_KEY?: string;
+  ANTHROPIC_MODEL?: string;
+  NEXO_OPENAI_API_KEY?: string;
+  NEXO_OPENAI_MODEL?: string;
+};
+
+export function assistantProviderConfigs(env: AssistantProviderEnvironment): AssistantProviderConfigs {
+  return {
+    gemini: {
+      apiKey: env.GEMINI_API_KEY,
+      model: env.GEMINI_MODEL || 'gemini-3.1-pro-preview',
+    },
+    anthropic: {
+      apiKey: env.ANTHROPIC_API_KEY,
+      model: env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
+    },
+    openai: {
+      apiKey: env.NEXO_OPENAI_API_KEY,
+      model: env.NEXO_OPENAI_MODEL || 'gpt-5.4',
+    },
+  };
+}
+
 export const ASSISTANT_PROVIDER_LABELS: Record<AssistantProvider, string> = {
   gemini: 'Gemini',
   anthropic: 'Claude',

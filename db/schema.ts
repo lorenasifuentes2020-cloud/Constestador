@@ -73,3 +73,15 @@ export const conversationMessages = sqliteTable('conversation_messages', {
   index('conversation_messages_conversation_created_idx').on(table.conversationId, table.createdAt),
   index('conversation_messages_workspace_idx').on(table.workspaceOwnerId),
 ]);
+
+export const publicStoreChannels = sqliteTable('public_store_channels', {
+  slug: text('slug').primaryKey(),
+  workspaceOwnerId: text('workspace_owner_id').notNull().references(() => workspaces.ownerId, { onDelete: 'cascade' }),
+  storeId: text('store_id').notNull(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('public_store_channels_workspace_store_unique').on(table.workspaceOwnerId, table.storeId),
+  index('public_store_channels_enabled_idx').on(table.enabled),
+]);

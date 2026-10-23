@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createStore } from '../lib/domain.ts';
 import {
   AssistantProviderError,
+  assistantProviderConfigs,
   generateAssistantReply,
   type AssistantProviderConfigs,
 } from '../lib/assistant-providers.ts';
@@ -14,6 +15,16 @@ const configs: AssistantProviderConfigs = {
 };
 
 const store = () => createStore({ name: 'Moda', category: 'Ropa', color: 'plum' });
+
+test('configura los tres proveedores sin exponer claves al navegador', () => {
+  const result = assistantProviderConfigs({
+    GEMINI_API_KEY: 'g', ANTHROPIC_API_KEY: 'a', NEXO_OPENAI_API_KEY: 'o',
+  });
+  assert.equal(result.gemini.apiKey, 'g');
+  assert.equal(result.anthropic.apiKey, 'a');
+  assert.equal(result.openai.apiKey, 'o');
+  assert.equal(result.gemini.model, 'gemini-3.1-pro-preview');
+});
 
 test('Claude recibe el mismo contexto comercial sin datos privados', async () => {
   let url = '';
