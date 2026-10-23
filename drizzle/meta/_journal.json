@@ -43,6 +43,20 @@
       "when": 1792766772528,
       "tag": "0005_even_chameleon",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792768059332,
+      "tag": "0006_empty_charles_xavier",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792785836219,
+      "tag": "0007_windy_champions",
+      "breakpoints": true
     }
   ]
 }

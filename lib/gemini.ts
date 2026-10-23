@@ -24,7 +24,7 @@ export class GeminiError extends Error {
 
 const shortened = (value: string, max: number) => value.trim().slice(0, max);
 
-export function buildSellerSystemPrompt(store: Store): string {
+export function buildSellerSystemPrompt(store: Store, knowledgeContext = ''): string {
   const products = store.products.filter((product) => product.active).slice(0, 250).map((product) => ({
     nombre: product.name,
     sku: product.sku,
@@ -32,6 +32,11 @@ export function buildSellerSystemPrompt(store: Store): string {
     precioPEN: product.price,
     stock: product.stock,
     descripcion: shortened(product.description, 500),
+    caracteristicas: shortened(product.features, 700),
+    beneficios: shortened(product.benefits, 700),
+    idealPara: shortened(product.idealFor, 500),
+    variantes: shortened(product.variants, 500),
+    argumentosComerciales: shortened(product.salesNotes, 700),
   }));
   const entries = (items: Store['faqs']) => items.filter((item) => item.active).slice(0, 80).map((item) => ({
     titulo: item.title,
@@ -51,10 +56,19 @@ export function buildSellerSystemPrompt(store: Store): string {
     `Instrucciones de atención: ${shortened(store.agent.instructions, 8000) || 'No configuradas.'}`,
     `Envíos: ${shortened(store.agent.shipping, 3000) || 'No configurados.'}`,
     `Pagos: ${shortened(store.agent.payments, 3000) || 'No configurados.'}`,
+    `Objetivo comercial: ${shortened(store.agent.salesObjective, 2000)}`,
+    `Preguntas para entender la necesidad: ${shortened(store.agent.qualificationQuestions, 4000)}`,
+    `Manejo de objeciones: ${shortened(store.agent.objectionHandling, 4000)}`,
+    `Instrucciones de cierre: ${shortened(store.agent.closingInstructions, 4000)}`,
+    'Proceso de venta: comprende la necesidad antes de recomendar; presenta hasta tres opciones pertinentes; explica diferencias con datos reales; atiende dudas; confirma intención y deriva al equipo para registrar el pedido.',
+    'No presiones, no uses urgencia falsa y no insistas después de que el cliente rechace la compra.',
     `Catálogo activo: ${JSON.stringify(products)}`,
     `Preguntas frecuentes: ${JSON.stringify(entries(store.faqs))}`,
     `Reglas de la tienda: ${JSON.stringify(entries(store.rules))}`,
     `Promociones vigentes registradas: ${JSON.stringify(entries(store.promotions))}`,
+    knowledgeContext
+      ? `Técnicas recuperadas de la biblioteca interna:\n${knowledgeContext}\nÚsalas como guía de conversación. El catálogo, precios, stock y reglas de la tienda siempre tienen prioridad. No menciones títulos ni fuentes internas al cliente salvo que te lo pida.`
+      : 'No se recuperaron fragmentos de la biblioteca para esta consulta.',
   ].join('\n');
 }
 
@@ -67,6 +81,7 @@ export async function generateGeminiReply(input: {
   store: Store;
   message: string;
   history: AssistantMessage[];
+  knowledgeContext?: string;
   fetcher?: typeof fetch;
 }): Promise<string> {
   if (!/^[a-zA-Z0-9._-]{1,100}$/.test(input.model)) {
@@ -91,7 +106,7 @@ export async function generateGeminiReply(input: {
           'x-goog-api-key': input.apiKey,
         },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: buildSellerSystemPrompt(input.store) }] },
+          systemInstruction: { parts: [{ text: buildSellerSystemPrompt(input.store, input.knowledgeContext) }] },
           contents,
           generationConfig: {
             temperature: 0.4,

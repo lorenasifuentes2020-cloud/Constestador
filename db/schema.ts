@@ -96,3 +96,52 @@ export const workspaceSnapshots = sqliteTable('workspace_snapshots', {
 }, (table) => [
   index('workspace_snapshots_owner_created_idx').on(table.workspaceOwnerId, table.createdAt),
 ]);
+
+export const paymentAttachments = sqliteTable('payment_attachments', {
+  id: text('id').primaryKey(),
+  workspaceOwnerId: text('workspace_owner_id').notNull().references(() => workspaces.ownerId, { onDelete: 'cascade' }),
+  storeId: text('store_id').notNull(),
+  orderId: text('order_id').notNull(),
+  paymentId: text('payment_id').notNull(),
+  objectKey: text('object_key').notNull(),
+  fileName: text('file_name').notNull(),
+  contentType: text('content_type').notNull(),
+  size: integer('size').notNull(),
+  uploadedBy: text('uploaded_by').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  uniqueIndex('payment_attachments_object_key_unique').on(table.objectKey),
+  index('payment_attachments_owner_order_idx').on(table.workspaceOwnerId, table.orderId, table.createdAt),
+  index('payment_attachments_payment_idx').on(table.paymentId),
+]);
+
+export const knowledgeDocuments = sqliteTable('knowledge_documents', {
+  id: text('id').primaryKey(),
+  workspaceOwnerId: text('workspace_owner_id').notNull().references(() => workspaces.ownerId, { onDelete: 'cascade' }),
+  storeId: text('store_id').notNull(),
+  title: text('title').notNull(),
+  fileName: text('file_name').notNull(),
+  contentType: text('content_type').notNull(),
+  size: integer('size').notNull(),
+  objectKey: text('object_key').notNull(),
+  pageCount: integer('page_count').notNull().default(0),
+  chunkCount: integer('chunk_count').notNull().default(0),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  uploadedBy: text('uploaded_by').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  uniqueIndex('knowledge_documents_object_key_unique').on(table.objectKey),
+  index('knowledge_documents_owner_store_idx').on(table.workspaceOwnerId, table.storeId, table.createdAt),
+]);
+
+export const knowledgeChunks = sqliteTable('knowledge_chunks', {
+  id: text('id').primaryKey(),
+  documentId: text('document_id').notNull().references(() => knowledgeDocuments.id, { onDelete: 'cascade' }),
+  workspaceOwnerId: text('workspace_owner_id').notNull().references(() => workspaces.ownerId, { onDelete: 'cascade' }),
+  storeId: text('store_id').notNull(),
+  position: integer('position').notNull(),
+  content: text('content').notNull(),
+}, (table) => [
+  uniqueIndex('knowledge_chunks_document_position_unique').on(table.documentId, table.position),
+  index('knowledge_chunks_owner_store_idx').on(table.workspaceOwnerId, table.storeId),
+]);

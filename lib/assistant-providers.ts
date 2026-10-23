@@ -62,6 +62,7 @@ type GenerateInput = {
   store: Store;
   message: string;
   history: AssistantMessage[];
+  knowledgeContext?: string;
   fetcher?: typeof fetch;
 };
 
@@ -116,7 +117,7 @@ async function generateClaudeReply(input: Omit<GenerateInput, 'provider' | 'conf
       model: input.model,
       max_tokens: 1200,
       temperature: 0.4,
-      system: buildSellerSystemPrompt(input.store),
+      system: buildSellerSystemPrompt(input.store, input.knowledgeContext),
       messages: [
         ...input.history.slice(-12).map((item) => ({ role: item.role, content: item.text })),
         { role: 'user', content: input.message },
@@ -141,7 +142,7 @@ async function generateOpenAIReply(input: Omit<GenerateInput, 'provider' | 'conf
     },
     body: JSON.stringify({
       model: input.model,
-      instructions: buildSellerSystemPrompt(input.store),
+      instructions: buildSellerSystemPrompt(input.store, input.knowledgeContext),
       input: [
         ...input.history.slice(-12).map((item) => ({
           role: item.role,
@@ -176,6 +177,7 @@ export async function generateAssistantReply(input: GenerateInput): Promise<stri
         store: input.store,
         message: input.message,
         history: input.history,
+        knowledgeContext: input.knowledgeContext,
         fetcher: input.fetcher,
       });
     } catch (error) {

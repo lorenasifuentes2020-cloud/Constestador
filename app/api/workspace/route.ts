@@ -6,6 +6,7 @@ import {
   recordWorkspaceActivity,
 } from '../../../lib/workspace-audit';
 import { createWorkspaceSnapshot } from '../../../lib/workspace-snapshots';
+import { assertWorkspaceFileReferences } from '../../../lib/workspace-files';
 import {
   resolveWorkspaceAccess,
   selectedWorkspaceOwner,
@@ -106,6 +107,17 @@ export async function POST(request: Request) {
       return json({ error: 'Solo la propietaria puede restaurar un respaldo completo.' }, 403);
     }
 
+    if (body.type === 'order.payment.remove') {
+      const paymentId = z.object({ paymentId: z.string().min(1).max(100) }).parse(body.payload).paymentId;
+      const attachments = await db.prepare(
+        `SELECT COUNT(*) AS total FROM payment_attachments
+          WHERE workspace_owner_id = ? AND payment_id = ?`,
+      ).bind(access.ownerId, paymentId).first<{ total: number }>();
+      if (Number(attachments?.total || 0) > 0) {
+        return json({ error: 'Elimina primero los comprobantes adjuntos a este pago.' }, 409);
+      }
+    }
+
     await db.prepare(
       `INSERT OR IGNORE INTO workspaces
        (owner_id, payload, version, updated_at) VALUES (?, ?, 0, ?)`,
@@ -130,6 +142,9 @@ export async function POST(request: Request) {
       body.type,
       body.payload,
     );
+    if (body.type === 'workspace.import') {
+      await assertWorkspaceFileReferences(db, access.ownerId, workspace);
+    }
     const result = await db.prepare(
       `UPDATE workspaces
           SET payload = ?, version = version + 1, updated_at = ?

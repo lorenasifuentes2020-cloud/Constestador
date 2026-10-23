@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { z } from 'zod';
 import { normalizeWorkspace, type Workspace } from '../../../../../lib/domain';
+import { retrieveKnowledgeContext } from '../../../../../lib/knowledge';
 import {
   AssistantProviderError,
   assistantProviderConfigs,
@@ -152,9 +153,14 @@ export async function POST(request: Request, context: RouteContext) {
     } else {
       try {
         const configs = assistantProviderConfigs(env);
+        const knowledgeContext = await retrieveKnowledgeContext(db, {
+          ownerId: channel.workspace_owner_id,
+          storeId: store.id,
+          query: [...history.slice(-4).map((item) => item.text), input.message].join(' '),
+        });
         reply = await generateAssistantReply({
           provider: store.agent.provider || 'gemini', configs, store,
-          message: input.message, history,
+          message: input.message, history, knowledgeContext,
         });
       } catch (error) {
         if (!(error instanceof AssistantProviderError)) throw error;

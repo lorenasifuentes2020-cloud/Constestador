@@ -7,6 +7,7 @@ import {
   listWorkspaceSnapshots,
 } from '../../../lib/workspace-snapshots';
 import { resolveWorkspaceAccess, selectedWorkspaceOwner } from '../../../lib/workspace-access';
+import { assertWorkspaceFileReferences } from '../../../lib/workspace-files';
 import { getChatGPTUser } from '../../chatgpt-auth';
 
 export const dynamic = 'force-dynamic';
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
     ).bind(input.snapshotId, ctx.access.ownerId).first<{ payload: string }>();
     if (!snapshot) return json({ error: 'Punto de recuperación no encontrado.' }, 404);
     const restored: Workspace = parseWorkspaceBackup(JSON.parse(snapshot.payload));
+    await assertWorkspaceFileReferences(ctx.db, ctx.access.ownerId, restored);
     await createWorkspaceSnapshot(ctx.db, {
       ownerId: ctx.access.ownerId,
       version: current.version,

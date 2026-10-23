@@ -6,20 +6,26 @@ import { buildGeminiSystemPrompt, generateGeminiReply } from '../lib/gemini.ts';
 function fixture() {
   const store = createStore({ name: 'Moda', category: 'Ropa', color: 'plum' });
   store.products = [
-    { id: 'active', name: 'Blusa', sku: 'BL', category: 'Ropa', price: 89.9, stock: 5, description: 'Algodón', active: true },
-    { id: 'hidden', name: 'Producto oculto', sku: 'OC', category: 'Ropa', price: 10, stock: 1, description: '', active: false },
+    { id: 'active', name: 'Blusa', sku: 'BL', category: 'Ropa', price: 89.9, stock: 5, description: 'Algodón', features: 'Tela ligera', benefits: 'Cómoda para clima cálido', idealFor: 'Uso diario', variants: 'Tallas S, M y L', salesNotes: 'Combina comodidad y acabado formal', active: true },
+    { id: 'hidden', name: 'Producto oculto', sku: 'OC', category: 'Ropa', price: 10, stock: 1, description: '', features: '', benefits: '', idealFor: '', variants: '', salesNotes: '', active: false },
   ];
   store.faqs = [{ id: 'faq', title: 'Tallas', content: 'S, M y L', active: true }];
   return store;
 }
 
 test('el contexto de Gemini incluye solo datos comerciales de la tienda', () => {
-  const prompt = buildGeminiSystemPrompt(fixture());
+  const prompt = buildGeminiSystemPrompt(fixture(), '[Fuente interna: Guía, fragmento 1]\nEscucha la objeción antes de responder.');
   assert.match(prompt, /Blusa/);
   assert.match(prompt, /S, M y L/);
+  assert.match(prompt, /Cómoda para clima cálido/);
   assert.match(prompt, /motorizado cubre todo Lima/);
   assert.doesNotMatch(prompt, /Producto oculto/);
   assert.match(prompt, /No ofrezcas condiciones de cambios o devoluciones/);
+  assert.match(prompt, /Proceso de venta: comprende la necesidad antes de recomendar/);
+  assert.match(prompt, /pregunta si desea que el equipo registre el pedido/);
+  assert.match(prompt, /No presiones, no uses urgencia falsa/);
+  assert.match(prompt, /Escucha la objeción antes de responder/);
+  assert.match(prompt, /No menciones títulos ni fuentes internas/);
 });
 
 test('envía historial breve a Gemini 3.1 Pro con razonamiento alto', async () => {
