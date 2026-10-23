@@ -2,9 +2,11 @@ import { env } from 'cloudflare:workers';
 import { z } from 'zod';
 import { normalizeWorkspace, type Workspace } from '../../../lib/domain';
 import {
-  generateGeminiReply,
-  GeminiError,
-} from '../../../lib/gemini';
+  ASSISTANT_PROVIDER_LABELS,
+  AssistantProviderError,
+  generateAssistantReply,
+  type AssistantProviderConfigs,
+} from '../../../lib/assistant-providers';
 import {
   resolveWorkspaceAccess,
   selectedWorkspaceOwner,
@@ -26,7 +28,7 @@ function failure(error: unknown) {
   if (error instanceof z.ZodError) {
     return json({ error: error.issues[0]?.message || 'Revisa el mensaje.' }, 400);
   }
-  if (error instanceof GeminiError) return json({ error: error.message }, error.status);
+  if (error instanceof AssistantProviderError) return json({ error: error.message }, error.status);
   const known = error as { name?: string; message?: string; status?: number };
   console.error('Assistant operation failed', known?.name);
   return json(
@@ -37,11 +39,32 @@ function failure(error: unknown) {
 
 export async function GET() {
   const user = await getChatGPTUser();
-  if (!user) return json({ error: 'Inicia sesión para revisar Gemini.' }, 401);
+  if (!user) return json({ error: 'Inicia sesión para revisar los motores de IA.' }, 401);
+  const providers = providerConfigs();
   return json({
-    configured: Boolean(env.GEMINI_API_KEY),
-    model: env.GEMINI_MODEL || 'gemini-3.1-pro-preview',
+    providers: Object.fromEntries(Object.entries(providers).map(([key, config]) => [key, {
+      configured: Boolean(config.apiKey),
+      model: config.model,
+      label: ASSISTANT_PROVIDER_LABELS[key as keyof typeof ASSISTANT_PROVIDER_LABELS],
+    }])),
   });
+}
+
+function providerConfigs(): AssistantProviderConfigs {
+  return {
+    gemini: {
+      apiKey: env.GEMINI_API_KEY,
+      model: env.GEMINI_MODEL || 'gemini-3.1-pro-preview',
+    },
+    anthropic: {
+      apiKey: env.ANTHROPIC_API_KEY,
+      model: env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
+    },
+    openai: {
+      apiKey: env.NEXO_OPENAI_API_KEY,
+      model: env.NEXO_OPENAI_MODEL || 'gpt-5.4',
+    },
+  };
 }
 
 export async function POST(request: Request) {
@@ -54,9 +77,6 @@ export async function POST(request: Request) {
     const user = await getChatGPTUser();
     if (!user) return json({ error: 'Inicia sesión para probar el vendedor.' }, 401);
     if (!env.DB) return json({ error: 'El almacenamiento no está disponible.' }, 503);
-    if (!env.GEMINI_API_KEY) {
-      return json({ error: 'Gemini todavía no tiene una clave configurada.' }, 503);
-    }
 
     const raw = await request.text();
     if (raw.length > 50_000) return json({ error: 'La conversación es demasiado grande.' }, 413);
@@ -81,15 +101,21 @@ export async function POST(request: Request) {
     const store = workspace.stores.find((item) => item.id === input.storeId);
     if (!store) return json({ error: 'La tienda no existe o no pertenece a tu espacio.' }, 404);
 
-    const model = env.GEMINI_MODEL || 'gemini-3.1-pro-preview';
-    const reply = await generateGeminiReply({
-      apiKey: env.GEMINI_API_KEY,
-      model,
+    const provider = store.agent.provider || 'gemini';
+    const configs = providerConfigs();
+    const reply = await generateAssistantReply({
+      provider,
+      configs,
       store,
       message: input.message,
       history: input.history,
     });
-    return json({ reply, model });
+    return json({
+      reply,
+      provider,
+      model: configs[provider].model,
+      providerLabel: ASSISTANT_PROVIDER_LABELS[provider],
+    });
   } catch (error) {
     return failure(error);
   }

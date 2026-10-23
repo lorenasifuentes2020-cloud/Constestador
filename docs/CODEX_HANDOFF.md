@@ -1,6 +1,6 @@
 # Nexo — continuidad en Codex
 
-Actualizado: 17 de octubre de 2026. Propietaria: Lorena Sifuentes.
+Actualizado: 23 de octubre de 2026. Propietaria: Lorena Sifuentes.
 
 ## Proyecto existente
 - URL: https://nexo-tiendas-lorena.regallime2.chatgpt.site/
@@ -18,7 +18,7 @@ El apartado Equipo permite a la propietaria invitar hasta diez administradores m
 El apartado Equipo también muestra actividad reciente por integrante. El registro guarda descripciones breves y evita copiar el contenido de clientes o pedidos.
 Los pedidos nuevos separan logística y pagos. Al crearlos se elige Lima o provincia y luego se registran manualmente los pagos verificados. Nexo calcula cobrado, saldo y muestra las etiquetas Pago pendiente/Pago parcial/Pago completado. Los pedidos anteriores marcados como pagados siguen siendo compatibles.
 La exportación JSON incluye una versión de formato. La propietaria puede restaurar un respaldo completo después de revisar un resumen y escribir RESTAURAR. El servidor valida límites, duplicados, referencias entre registros, totales y abonos antes de reemplazar las tiendas. Los administradores pueden exportar, pero no restaurar todo el espacio.
-El probador ya está preparado para consultar Gemini desde el servidor y solo funciona cuando el entorno tiene `GEMINI_API_KEY`. Envía catálogo activo, configuración de la tienda e historial breve; no envía clientes, pedidos ni pagos. WhatsApp, Instagram, Messenger, chat web, pagos externos y biblioteca documental NO están integrados.
+El probador ya admite tres proveedores seleccionables por tienda: Gemini (`GEMINI_API_KEY`), Claude (`ANTHROPIC_API_KEY`) y ChatGPT mediante la API de OpenAI (`NEXO_OPENAI_API_KEY`). Envía catálogo activo, configuración de la tienda e historial breve; no envía clientes, pedidos ni pagos. Las claves viven solo como secretos del servidor. WhatsApp, Instagram, Messenger, chat web, pagos externos y biblioteca documental NO están integrados.
 Datos: workspaces(owner_id, payload JSON, version, updated_at), con control de versión para evitar sobrescrituras; workspace_members relaciona los administradores con el espacio de la propietaria; workspace_audit_log conserva actividad breve del equipo. Antes de escalar conversaciones, normalizar tablas y añadir cola e idempotencia.
 
 ## Reglas comerciales confirmadas por Lorena
@@ -33,14 +33,14 @@ Datos: workspaces(owner_id, payload JSON, version, updated_at), con control de v
 ## Agentes deseados
 Conversación natural, breve y contextual; recordar lo hablado y preguntar lo necesario. Biblioteca común de técnicas de venta y libros, junto con conocimiento específico por tienda. Recuperar fuentes relevantes, no afirmar que cargar documentos reentrena al modelo. Separar clientes por tienda; precios y stock siempre desde catálogo; aprobación humana para excepciones. No garantizar ventas ni fingir identidad humana.
 
-## Modelo de IA y costes
-Lorena eligió Gemini como cerebro del vendedor y no quiere usar la API de ChatGPT/OpenAI. La integración usa una clave de Google AI Studio guardada como secreto del servidor y un modelo configurable, inicialmente `gemini-3.1-pro-preview` con nivel de razonamiento alto. La disponibilidad, cuota gratuita y facturación dependen de la cuenta y del modelo habilitado en Google; comprobarlas antes del piloto. Iniciar sesión con ChatGPT se usa para identidad y administración, no aporta cuota de Gemini.
+## Modelos de IA y costes
+Lorena decidió que cada tienda pueda elegir entre Gemini, Claude o ChatGPT. Los modelos son configurables desde el servidor; los valores iniciales son `gemini-3.1-pro-preview`, `claude-sonnet-4-6` y `gpt-5.4`. La disponibilidad, cuota y facturación dependen de cada cuenta y proveedor, por lo que deben validarse antes del piloto. Iniciar sesión con ChatGPT se usa para identidad y administración; no aporta cuota de la API de OpenAI ni de los otros proveedores.
 
 ## Siguientes pasos
 1. Añadir comprobantes adjuntos cuando exista almacenamiento de archivos.
-2. Añadir la clave de Google AI Studio, confirmar que `gemini-3.1-pro-preview` está habilitado y probar sus límites.
+2. Añadir al menos una clave de IA, confirmar que el modelo elegido está habilitado y probar sus límites.
 3. Automatizar copias periódicas y definir una política de retención antes de usar datos reales a escala.
-4. Validar cuotas y facturación de Gemini en la cuenta de Google AI Studio antes del piloto.
+4. Validar cuotas y facturación de cada proveedor que se vaya a habilitar antes del piloto.
 5. Biblioteca con archivos, extracción y recuperación por tienda.
 6. Un canal y una tienda piloto; medir calidad, derivaciones y conversiones antes de ampliar.
 

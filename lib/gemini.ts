@@ -24,7 +24,7 @@ export class GeminiError extends Error {
 
 const shortened = (value: string, max: number) => value.trim().slice(0, max);
 
-export function buildGeminiSystemPrompt(store: Store): string {
+export function buildSellerSystemPrompt(store: Store): string {
   const products = store.products.filter((product) => product.active).slice(0, 250).map((product) => ({
     nombre: product.name,
     sku: product.sku,
@@ -58,6 +58,9 @@ export function buildGeminiSystemPrompt(store: Store): string {
   ].join('\n');
 }
 
+// Backwards-compatible export for existing integrations and backups of test code.
+export const buildGeminiSystemPrompt = buildSellerSystemPrompt;
+
 export async function generateGeminiReply(input: {
   apiKey: string;
   model: string;
@@ -88,7 +91,7 @@ export async function generateGeminiReply(input: {
           'x-goog-api-key': input.apiKey,
         },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: buildGeminiSystemPrompt(input.store) }] },
+          systemInstruction: { parts: [{ text: buildSellerSystemPrompt(input.store) }] },
           contents,
           generationConfig: {
             temperature: 0.4,

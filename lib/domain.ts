@@ -5,7 +5,7 @@ export type Payment = {id:string;amount:number;method:string;reference:string;cr
 export type Refund = Payment;
 export type Order = {id:string;number:string;contactId:string;customer:string;items:{productId:string;name:string;quantity:number;price:number}[];total:number;status:string;paymentStatus:string;paymentPlan?:'province-advance'|'lima-cod';expectedAdvance?:number;payments?:Payment[];refunds?:Refund[];channel:string;createdAt:string;notes:string};
 export type Entry = {id:string;title:string;content:string;active:boolean};
-export type Agent = {name:string;tone:string;description:string;greeting:string;instructions:string;shipping:string;payments:string};
+export type Agent = {name:string;tone:string;description:string;greeting:string;instructions:string;shipping:string;payments:string;provider:'gemini'|'anthropic'|'openai'};
 export type Store = {id:string;name:string;category:string;color:string;createdAt:string;demo:boolean;products:Product[];contacts:Contact[];orders:Order[];faqs:Entry[];rules:Entry[];promotions:Entry[];agent:Agent;modules:{wholesale:boolean;advisors:boolean}};
 export type Workspace = {stores:Store[]};
 const str=(max=300)=>z.string().trim().max(max);
@@ -15,7 +15,7 @@ const baseStore=z.object({name:required(80),category:required(80),color:z.enum([
 const product=z.object({id:id.optional(),name:required(),sku:str(60),category:str(80),price:z.number().finite().min(0).max(1e7),stock:z.number().int().min(0).max(1e7),description:str(2000),active:z.boolean()});
 const contact=z.object({id:id.optional(),name:required(),phone:str(30),email:z.union([z.literal(''),z.string().email()]).default(''),stage:z.enum(['Nuevo','En conversación','Cliente','Inactivo']),notes:str(2000)});
 const entry=z.object({id:id.optional(),title:required(200),content:required(4000),active:z.boolean()});
-const agent=z.object({name:required(80),tone:z.enum(['Cercano','Profesional','Entusiasta']),description:str(4000),greeting:str(1000),instructions:str(8000),shipping:str(3000),payments:str(3000)});
+const agent=z.object({name:required(80),tone:z.enum(['Cercano','Profesional','Entusiasta']),description:str(4000),greeting:str(1000),instructions:str(8000),shipping:str(3000),payments:str(3000),provider:z.enum(['gemini','anthropic','openai']).default('gemini')});
 const paymentMethod=z.enum(['Efectivo','Yape','Plin','Transferencia','Tarjeta','Otro']);
 const timestamp=z.string().datetime({offset:true});
 const storedProduct=product.extend({id});
@@ -39,9 +39,9 @@ export const DEFAULT_SHIPPING='El envío está incluido en el precio del pedido.
 const LEGACY_PAYMENTS='Provincias fuera de Lima: adelanto del 50% del valor de los productos, envío por Shalom y pago posterior del saldo. Lima: opción de pago al recibir en casa con el motorizado. Confirmar con la tienda el momento exacto del saldo y los costos de envío. Un adelanto no es un pago completo.';
 const LEGACY_SHIPPING='Provincias fuera de Lima: envío por Shalom después del adelanto del 50% del valor de los productos. Lima: entrega a domicilio con motorizado y opción de pago al recibir. Confirmar cobertura, tarifa y plazos con la tienda.';
 const uid=()=>crypto.randomUUID();
-export function createStore(input:z.infer<typeof baseStore>,demo=false):Store{return {id:uid(),...input,createdAt:new Date().toISOString(),demo,products:[],contacts:[],orders:[],faqs:[],rules:[],promotions:[],agent:{name:'Asistente de '+input.name,tone:'Cercano',description:'',greeting:'¡Hola! Bienvenido a '+input.name+'. ¿En qué puedo ayudarte?',instructions:'No inventes precios ni disponibilidad. Consulta el catálogo y deriva a una persona cuando no tengas información suficiente.',shipping:DEFAULT_SHIPPING,payments:DEFAULT_PAYMENTS},modules:{wholesale:false,advisors:false}};}
+export function createStore(input:z.infer<typeof baseStore>,demo=false):Store{return {id:uid(),...input,createdAt:new Date().toISOString(),demo,products:[],contacts:[],orders:[],faqs:[],rules:[],promotions:[],agent:{name:'Asistente de '+input.name,tone:'Cercano',description:'',greeting:'¡Hola! Bienvenido a '+input.name+'. ¿En qué puedo ayudarte?',instructions:'No inventes precios ni disponibilidad. Consulta el catálogo y deriva a una persona cuando no tengas información suficiente.',shipping:DEFAULT_SHIPPING,payments:DEFAULT_PAYMENTS,provider:'gemini'},modules:{wholesale:false,advisors:false}};}
 export class DomainError extends Error {status=400;}
-export function normalizeWorkspace(input:Workspace):Workspace {const workspace=structuredClone(input);for(const store of workspace.stores){if(store.agent.payments===LEGACY_PAYMENTS)store.agent.payments=DEFAULT_PAYMENTS;if(store.agent.shipping===LEGACY_SHIPPING||store.agent.shipping==='Envíos de ejemplo a Lima y provincias. Confirmar cobertura y costo antes de cerrar el pedido.')store.agent.shipping=DEFAULT_SHIPPING;delete (store.agent as Agent&{returns?:string}).returns;}return workspace;}
+export function normalizeWorkspace(input:Workspace):Workspace {const workspace=structuredClone(input);for(const store of workspace.stores){if(!['gemini','anthropic','openai'].includes(store.agent.provider))store.agent.provider='gemini';if(store.agent.payments===LEGACY_PAYMENTS)store.agent.payments=DEFAULT_PAYMENTS;if(store.agent.shipping===LEGACY_SHIPPING||store.agent.shipping==='Envíos de ejemplo a Lima y provincias. Confirmar cobertura y costo antes de cerrar el pedido.')store.agent.shipping=DEFAULT_SHIPPING;delete (store.agent as Agent&{returns?:string}).returns;}return workspace;}
 export function parseWorkspaceBackup(input:unknown):Workspace {
  const parsed=backupDocument.safeParse(input);if(!parsed.success)throw new DomainError('El archivo no tiene un formato de respaldo válido de Nexo.');
  const workspace:Workspace={stores:parsed.data.stores};const storeIds=new Set<string>();

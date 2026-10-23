@@ -108,9 +108,9 @@ node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1
 
 Replace `DB` with your D1 binding name if different. Wrangler records applied migrations, so the command is safe to repeat. Use `.wrangler/state`, not `.wrangler/state/v3`; Wrangler adds the versioned directories. This updates only the preview database; publishing applies production migrations separately.
 
-## Gemini seller preview
+## AI seller preview
 
-The authenticated seller preview calls Gemini only from `app/api/assistant`. Configure `GEMINI_API_KEY` as a server secret and optionally set `GEMINI_MODEL`; the current default is `gemini-3.1-pro-preview`. Never place the API key in source, browser variables, prompts, or store records. The route sends active catalog data and store instructions, without contacts, orders, or payment records.
+The authenticated seller preview supports Gemini, Claude, and ChatGPT through `app/api/assistant`. Each store selects its provider while all providers use the same commercial context and privacy boundary. Configure one or more server secrets: `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, and `NEXO_OPENAI_API_KEY`. Models can be overridden with `GEMINI_MODEL`, `ANTHROPIC_MODEL`, and `NEXO_OPENAI_MODEL`. Never place API keys in source, browser variables, prompts, or store records. The route sends active catalog data and store instructions, without contacts, orders, or payment records.
 
 ## Diagnostic Commands
 
