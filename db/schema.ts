@@ -40,3 +40,36 @@ export const workspaceAuditLog = sqliteTable('workspace_audit_log', {
   index('workspace_audit_owner_created_idx').on(table.workspaceOwnerId, table.createdAt),
   index('workspace_audit_actor_idx').on(table.actorUserId),
 ]);
+
+export const conversations = sqliteTable('conversations', {
+  id: text('id').primaryKey(),
+  workspaceOwnerId: text('workspace_owner_id').notNull().references(() => workspaces.ownerId, { onDelete: 'cascade' }),
+  storeId: text('store_id').notNull(),
+  channel: text('channel', { enum: ['Manual', 'Web', 'WhatsApp', 'Instagram', 'Messenger'] }).notNull(),
+  externalId: text('external_id'),
+  customerName: text('customer_name').notNull(),
+  status: text('status', { enum: ['open', 'waiting', 'closed'] }).notNull().default('open'),
+  mode: text('mode', { enum: ['ai', 'human'] }).notNull().default('ai'),
+  assignedUserId: text('assigned_user_id'),
+  lastMessagePreview: text('last_message_preview').notNull().default(''),
+  lastMessageAt: text('last_message_at').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  index('conversations_workspace_updated_idx').on(table.workspaceOwnerId, table.updatedAt),
+  index('conversations_store_status_idx').on(table.storeId, table.status),
+  uniqueIndex('conversations_external_unique').on(table.workspaceOwnerId, table.channel, table.externalId),
+]);
+
+export const conversationMessages = sqliteTable('conversation_messages', {
+  id: text('id').primaryKey(),
+  conversationId: text('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  workspaceOwnerId: text('workspace_owner_id').notNull().references(() => workspaces.ownerId, { onDelete: 'cascade' }),
+  sender: text('sender', { enum: ['customer', 'assistant', 'team', 'system'] }).notNull(),
+  actorUserId: text('actor_user_id'),
+  body: text('body').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  index('conversation_messages_conversation_created_idx').on(table.conversationId, table.createdAt),
+  index('conversation_messages_workspace_idx').on(table.workspaceOwnerId),
+]);

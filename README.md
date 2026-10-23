@@ -112,6 +112,8 @@ Replace `DB` with your D1 binding name if different. Wrangler records applied mi
 
 The authenticated seller preview supports Gemini, Claude, and ChatGPT through `app/api/assistant`. Each store selects its provider while all providers use the same commercial context and privacy boundary. Configure one or more server secrets: `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, and `NEXO_OPENAI_API_KEY`. Models can be overridden with `GEMINI_MODEL`, `ANTHROPIC_MODEL`, and `NEXO_OPENAI_MODEL`. Never place API keys in source, browser variables, prompts, or store records. The route sends active catalog data and store instructions, without contacts, orders, or payment records.
 
+The authenticated conversation inbox uses normalized `conversations` and `conversation_messages` D1 tables. It supports manual intake, message history, workflow status, and human/AI assignment. External channels and the public web chat are not connected yet.
+
 ## Diagnostic Commands
 
 - `npm run install:ci`: perform the one locked dependency install
