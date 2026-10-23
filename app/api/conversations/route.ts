@@ -11,6 +11,7 @@ import {
   selectedWorkspaceOwner,
 } from '../../../lib/workspace-access';
 import { getChatGPTUser } from '../../chatgpt-auth';
+import { sendWhatsAppText, whatsappRecipient } from '../../../lib/whatsapp';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,9 +86,9 @@ async function listConversations(ctx: Context, storeId?: string | null) {
 
 async function requireConversation(ctx: Context, id: string) {
   const conversation = await ctx.db.prepare(
-    `SELECT id, store_id FROM conversations
+    `SELECT id, store_id, channel, external_id FROM conversations
       WHERE id = ? AND workspace_owner_id = ?`,
-  ).bind(id, ctx.access.ownerId).first<{ id: string; store_id: string }>();
+  ).bind(id, ctx.access.ownerId).first<{ id: string; store_id: string; channel: string; external_id: string | null }>();
   if (!conversation) throw Object.assign(new Error('Conversación no encontrada.'), { status: 404 });
   return conversation;
 }
@@ -180,7 +181,7 @@ export async function POST(request: Request) {
       mode: z.enum(['ai', 'human']).optional(),
       status: z.enum(['open', 'waiting', 'closed']).optional(),
     }).parse(JSON.parse(raw));
-    await requireConversation(ctx, input.conversationId);
+    const conversation = await requireConversation(ctx, input.conversationId);
 
     if (input.action === 'message') {
       if (!input.text) return json({ error: 'Escribe un mensaje.' }, 400);
@@ -188,6 +189,14 @@ export async function POST(request: Request) {
         'SELECT COUNT(*) AS total FROM conversation_messages WHERE conversation_id = ?',
       ).bind(input.conversationId).first<{ total: number }>();
       if ((messageCount?.total ?? 0) >= 500) return json({ error: 'Esta conversación alcanzó el límite de mensajes.' }, 400);
+      if (conversation.channel === 'WhatsApp') {
+        const recipient = whatsappRecipient(conversation.external_id || '');
+        const phoneNumberId = (conversation.external_id || '').split(':')[0];
+        if (!recipient || !/^\d{5,30}$/.test(phoneNumberId)) {
+          return json({ error: 'La conversación no tiene un destinatario de WhatsApp válido.' }, 409);
+        }
+        await sendWhatsAppText({ env, phoneNumberId, recipient, text: input.text });
+      }
       await ctx.db.batch([
         ctx.db.prepare(
           `INSERT INTO conversation_messages

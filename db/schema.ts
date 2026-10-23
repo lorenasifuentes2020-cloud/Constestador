@@ -145,3 +145,30 @@ export const knowledgeChunks = sqliteTable('knowledge_chunks', {
   uniqueIndex('knowledge_chunks_document_position_unique').on(table.documentId, table.position),
   index('knowledge_chunks_owner_store_idx').on(table.workspaceOwnerId, table.storeId),
 ]);
+
+export const whatsappChannels = sqliteTable('whatsapp_channels', {
+  id: text('id').primaryKey(),
+  workspaceOwnerId: text('workspace_owner_id').notNull().references(() => workspaces.ownerId, { onDelete: 'cascade' }),
+  storeId: text('store_id').notNull(),
+  phoneNumberId: text('phone_number_id').notNull(),
+  businessAccountId: text('business_account_id').notNull().default(''),
+  displayPhoneNumber: text('display_phone_number').notNull().default(''),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('whatsapp_channels_phone_number_unique').on(table.phoneNumberId),
+  uniqueIndex('whatsapp_channels_workspace_store_unique').on(table.workspaceOwnerId, table.storeId),
+  index('whatsapp_channels_owner_idx').on(table.workspaceOwnerId),
+]);
+
+export const whatsappEvents = sqliteTable('whatsapp_events', {
+  eventId: text('event_id').primaryKey(),
+  phoneNumberId: text('phone_number_id').notNull(),
+  status: text('status', { enum: ['processing', 'processed', 'failed'] }).notNull().default('processing'),
+  error: text('error'),
+  receivedAt: text('received_at').notNull(),
+  processedAt: text('processed_at'),
+}, (table) => [
+  index('whatsapp_events_received_idx').on(table.receivedAt),
+]);
