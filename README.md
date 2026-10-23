@@ -114,6 +114,8 @@ The authenticated seller preview supports Gemini, Claude, and ChatGPT through `a
 
 The authenticated conversation inbox uses normalized `conversations` and `conversation_messages` D1 tables. It supports manual intake, message history, workflow status, and human/AI assignment. Each store can enable a revocable public web-chat link backed by `public_store_channels`; AI failures fall back to the team inbox. WhatsApp, Instagram, and Messenger are not connected yet.
 
+Workspace changes keep up to ten automatic recovery points in `workspace_snapshots`. Owners can also create a manual point or restore an earlier version; Nexo saves the current state again before restoration. JSON export and validated file restore remain available for off-platform backups.
+
 ## Diagnostic Commands
 
 - `npm run install:ci`: perform the one locked dependency install

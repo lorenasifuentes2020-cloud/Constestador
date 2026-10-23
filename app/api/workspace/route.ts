@@ -5,6 +5,7 @@ import {
   describeWorkspaceAction,
   recordWorkspaceActivity,
 } from '../../../lib/workspace-audit';
+import { createWorkspaceSnapshot } from '../../../lib/workspace-snapshots';
 import {
   resolveWorkspaceAccess,
   selectedWorkspaceOwner,
@@ -144,6 +145,17 @@ export async function POST(request: Request) {
       return json({
         error: 'Otro cambio se guardó al mismo tiempo. Actualiza la página antes de continuar.',
       }, 409);
+    }
+
+    try {
+      await createWorkspaceSnapshot(db, {
+        ownerId: access.ownerId,
+        version: row.version,
+        payload: row.payload,
+        reason: 'automatic',
+      });
+    } catch (snapshotError) {
+      console.error('Automatic workspace snapshot failed', (snapshotError as { name?: string }).name);
     }
 
     await recordWorkspaceActivity(db, {

@@ -36,6 +36,13 @@
       "when": 1792766336621,
       "tag": "0004_talented_nebula",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792766772528,
+      "tag": "0005_even_chameleon",
+      "breakpoints": true
     }
   ]
 }

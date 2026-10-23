@@ -85,3 +85,14 @@ export const publicStoreChannels = sqliteTable('public_store_channels', {
   uniqueIndex('public_store_channels_workspace_store_unique').on(table.workspaceOwnerId, table.storeId),
   index('public_store_channels_enabled_idx').on(table.enabled),
 ]);
+
+export const workspaceSnapshots = sqliteTable('workspace_snapshots', {
+  id: text('id').primaryKey(),
+  workspaceOwnerId: text('workspace_owner_id').notNull().references(() => workspaces.ownerId, { onDelete: 'cascade' }),
+  workspaceVersion: integer('workspace_version').notNull(),
+  payload: text('payload').notNull(),
+  reason: text('reason', { enum: ['automatic', 'manual', 'before_restore'] }).notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  index('workspace_snapshots_owner_created_idx').on(table.workspaceOwnerId, table.createdAt),
+]);
