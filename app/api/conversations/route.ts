@@ -5,6 +5,7 @@ import type {
   ConversationMessage,
   ConversationSummary,
 } from '../../../lib/conversations';
+import { CONVERSATION_SALES_STAGES } from '../../../lib/conversations';
 import { recordWorkspaceActivity } from '../../../lib/workspace-audit';
 import {
   resolveWorkspaceAccess,
@@ -57,11 +58,11 @@ async function listConversations(ctx: Context, storeId?: string | null) {
     throw Object.assign(new Error('La tienda no pertenece a este espacio.'), { status: 404 });
   }
   const query = storeId
-    ? `SELECT id, store_id, channel, customer_name, status, mode, assigned_user_id,
+    ? `SELECT id, store_id, channel, customer_name, status, sales_stage, mode, assigned_user_id,
               last_message_preview, last_message_at, created_at
          FROM conversations WHERE workspace_owner_id = ? AND store_id = ?
          ORDER BY last_message_at DESC LIMIT 100`
-    : `SELECT id, store_id, channel, customer_name, status, mode, assigned_user_id,
+    : `SELECT id, store_id, channel, customer_name, status, sales_stage, mode, assigned_user_id,
               last_message_preview, last_message_at, created_at
          FROM conversations WHERE workspace_owner_id = ?
          ORDER BY last_message_at DESC LIMIT 100`;
@@ -76,12 +77,25 @@ async function listConversations(ctx: Context, storeId?: string | null) {
     channel: row.channel,
     customerName: String(row.customer_name),
     status: row.status,
+    salesStage: row.sales_stage || 'inquiry',
     mode: row.mode,
     assignedUserId: row.assigned_user_id ? String(row.assigned_user_id) : null,
     lastMessagePreview: String(row.last_message_preview),
     lastMessageAt: String(row.last_message_at),
     createdAt: String(row.created_at),
   })) as ConversationSummary[];
+}
+
+async function salesStageCounts(ctx: Context, storeId?: string | null) {
+  const query = storeId
+    ? `SELECT sales_stage, COUNT(*) AS total FROM conversations
+        WHERE workspace_owner_id = ? AND store_id = ? GROUP BY sales_stage`
+    : `SELECT sales_stage, COUNT(*) AS total FROM conversations
+        WHERE workspace_owner_id = ? GROUP BY sales_stage`;
+  const result = storeId
+    ? await ctx.db.prepare(query).bind(ctx.access.ownerId, storeId).all<{ sales_stage: string; total: number }>()
+    : await ctx.db.prepare(query).bind(ctx.access.ownerId).all<{ sales_stage: string; total: number }>();
+  return Object.fromEntries(result.results.map((row) => [row.sales_stage || 'inquiry', Number(row.total)]));
 }
 
 async function requireConversation(ctx: Context, id: string) {
@@ -121,6 +135,7 @@ export async function GET(request: Request) {
     return json({
       conversations: await listConversations(ctx, storeId),
       messages: conversationId ? await listMessages(ctx, conversationId) : [],
+      salesStageCounts: await salesStageCounts(ctx, storeId),
     });
   } catch (error) {
     return failure(error);
@@ -175,11 +190,12 @@ export async function POST(request: Request) {
     }
 
     const input = z.object({
-      action: z.enum(['message', 'mode', 'status']),
+      action: z.enum(['message', 'mode', 'status', 'stage']),
       conversationId: z.string().uuid(),
       text: z.string().trim().min(1).max(2000).optional(),
       mode: z.enum(['ai', 'human']).optional(),
       status: z.enum(['open', 'waiting', 'closed']).optional(),
+      salesStage: z.enum(CONVERSATION_SALES_STAGES).optional(),
     }).parse(JSON.parse(raw));
     const conversation = await requireConversation(ctx, input.conversationId);
 
@@ -218,12 +234,24 @@ export async function POST(request: Request) {
         `UPDATE conversations SET mode = ?, assigned_user_id = ?, updated_at = ?
           WHERE id = ? AND workspace_owner_id = ?`,
       ).bind(input.mode, input.mode === 'human' ? ctx.user.userId : null, now, input.conversationId, ctx.access.ownerId).run();
-    } else {
+    } else if (input.action === 'status') {
       if (!input.status) return json({ error: 'Selecciona un estado.' }, 400);
       await ctx.db.prepare(
         `UPDATE conversations SET status = ?, updated_at = ?
           WHERE id = ? AND workspace_owner_id = ?`,
       ).bind(input.status, now, input.conversationId, ctx.access.ownerId).run();
+    } else {
+      if (!input.salesStage) return json({ error: 'Selecciona una etapa comercial.' }, 400);
+      await ctx.db.prepare(
+        `UPDATE conversations SET sales_stage = ?, updated_at = ?
+          WHERE id = ? AND workspace_owner_id = ?`,
+      ).bind(input.salesStage, now, input.conversationId, ctx.access.ownerId).run();
+      await recordWorkspaceActivity(ctx.db, {
+        access: ctx.access,
+        user: ctx.user,
+        action: 'conversation.stage',
+        summary: 'Actualizó la etapa comercial de una conversación',
+      });
     }
     return json({ conversations: await listConversations(ctx) });
   } catch (error) {

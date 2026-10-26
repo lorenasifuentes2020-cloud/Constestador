@@ -1,0 +1,2 @@
+ALTER TABLE `conversations` ADD `sales_stage` text DEFAULT 'inquiry' NOT NULL;--> statement-breakpoint
+CREATE INDEX `conversations_workspace_sales_stage_idx` ON `conversations` (`workspace_owner_id`,`sales_stage`);

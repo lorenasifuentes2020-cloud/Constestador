@@ -49,6 +49,7 @@ export const conversations = sqliteTable('conversations', {
   externalId: text('external_id'),
   customerName: text('customer_name').notNull(),
   status: text('status', { enum: ['open', 'waiting', 'closed'] }).notNull().default('open'),
+  salesStage: text('sales_stage', { enum: ['inquiry', 'interested', 'ready', 'order_created', 'won', 'lost'] }).notNull().default('inquiry'),
   mode: text('mode', { enum: ['ai', 'human'] }).notNull().default('ai'),
   assignedUserId: text('assigned_user_id'),
   lastMessagePreview: text('last_message_preview').notNull().default(''),
@@ -58,6 +59,7 @@ export const conversations = sqliteTable('conversations', {
 }, (table) => [
   index('conversations_workspace_updated_idx').on(table.workspaceOwnerId, table.updatedAt),
   index('conversations_store_status_idx').on(table.storeId, table.status),
+  index('conversations_workspace_sales_stage_idx').on(table.workspaceOwnerId, table.salesStage),
   uniqueIndex('conversations_external_unique').on(table.workspaceOwnerId, table.channel, table.externalId),
 ]);
 

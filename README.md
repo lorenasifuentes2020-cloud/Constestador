@@ -114,6 +114,8 @@ The authenticated seller preview supports Gemini, Claude, and ChatGPT through `a
 
 The authenticated conversation inbox uses normalized `conversations` and `conversation_messages` D1 tables. It supports manual intake, message history, workflow status, and human/AI assignment. Each store can enable a revocable public web-chat link backed by `public_store_channels`; AI failures fall back to the team inbox.
 
+Every conversation also has a manual commercial stage: inquiry, interested, ready to buy, order created, sale closed, or not converted. The Metrics page aggregates the complete conversation history by stage, independently from order and payment records.
+
 WhatsApp Cloud API support is available per store through `whatsapp_channels` and `/api/whatsapp/webhook`. Configure `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_APP_SECRET`, and `WHATSAPP_VERIFY_TOKEN` as server secrets, enter the Meta Phone Number ID in Channels, register the displayed webhook URL in Meta, and subscribe the `messages` field. Incoming events are signature-checked and deduplicated in `whatsapp_events`. Text messages use the store's selected AI provider, catalog, sales playbook, and knowledge library; unsupported media transfers the conversation to the team. Team replies from the inbox are delivered through the Graph API. Instagram and Messenger are not connected yet.
 
 Workspace changes keep up to ten automatic recovery points in `workspace_snapshots`. Owners can also create a manual point or restore an earlier version; Nexo saves the current state again before restoration. JSON export and validated file restore remain available for off-platform backups.
