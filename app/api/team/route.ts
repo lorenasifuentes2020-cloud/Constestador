@@ -185,13 +185,19 @@ export async function DELETE(request: Request) {
     const access = await requireOwner(db, user, request);
     const id = z.string().uuid().parse(new URL(request.url).searchParams.get('id'));
     const member = await db.prepare(
-      'SELECT member_email FROM workspace_members WHERE id = ? AND workspace_owner_id = ?',
-    ).bind(id, user.userId).first<{ member_email: string }>();
+      'SELECT member_email, member_user_id FROM workspace_members WHERE id = ? AND workspace_owner_id = ?',
+    ).bind(id, user.userId).first<{ member_email: string; member_user_id: string | null }>();
     if (!member) return json({ error: 'Miembro no encontrado.' }, 404);
     const result = await db.prepare(
       'DELETE FROM workspace_members WHERE id = ? AND workspace_owner_id = ?',
     ).bind(id, user.userId).run();
     if (result.meta.changes !== 1) return json({ error: 'Miembro no encontrado.' }, 404);
+    if (member.member_user_id) {
+      await db.prepare(
+        `UPDATE conversations SET assigned_user_id = NULL, updated_at = ?
+          WHERE workspace_owner_id = ? AND assigned_user_id = ?`,
+      ).bind(new Date().toISOString(), user.userId, member.member_user_id).run();
+    }
     await recordWorkspaceActivity(db, {
       access,
       user,

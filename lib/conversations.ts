@@ -34,3 +34,9 @@ export type ConversationMessage = {
   body: string;
   createdAt: string;
 };
+
+export type ConversationAdvisor = {
+  userId: string;
+  email: string;
+  role: 'owner' | 'admin';
+};

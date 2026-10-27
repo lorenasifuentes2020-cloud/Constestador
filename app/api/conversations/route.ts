@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { z } from 'zod';
 import { normalizeWorkspace, type Workspace } from '../../../lib/domain';
 import type {
+  ConversationAdvisor,
   ConversationMessage,
   ConversationSummary,
 } from '../../../lib/conversations';
@@ -98,6 +99,30 @@ async function salesStageCounts(ctx: Context, storeId?: string | null) {
   return Object.fromEntries(result.results.map((row) => [row.sales_stage || 'inquiry', Number(row.total)]));
 }
 
+async function listAdvisors(ctx: Context): Promise<ConversationAdvisor[]> {
+  const result = await ctx.db.prepare(
+    `SELECT member_user_id, member_email FROM workspace_members
+      WHERE workspace_owner_id = ? AND status = 'active' AND member_user_id IS NOT NULL
+      ORDER BY member_email ASC`,
+  ).bind(ctx.access.ownerId).all<{ member_user_id: string; member_email: string }>();
+  return [
+    { userId: ctx.access.ownerId, email: ctx.access.ownerEmail, role: 'owner' },
+    ...result.results.map((row) => ({
+      userId: row.member_user_id,
+      email: row.member_email,
+      role: 'admin' as const,
+    })),
+  ];
+}
+
+async function validAdvisor(ctx: Context, userId: string) {
+  if (userId === ctx.access.ownerId) return true;
+  return Boolean(await ctx.db.prepare(
+    `SELECT 1 FROM workspace_members
+      WHERE workspace_owner_id = ? AND member_user_id = ? AND status = 'active'`,
+  ).bind(ctx.access.ownerId, userId).first());
+}
+
 async function requireConversation(ctx: Context, id: string) {
   const conversation = await ctx.db.prepare(
     `SELECT id, store_id, channel, external_id FROM conversations
@@ -136,6 +161,7 @@ export async function GET(request: Request) {
       conversations: await listConversations(ctx, storeId),
       messages: conversationId ? await listMessages(ctx, conversationId) : [],
       salesStageCounts: await salesStageCounts(ctx, storeId),
+      advisors: await listAdvisors(ctx),
     });
   } catch (error) {
     return failure(error);
@@ -190,12 +216,13 @@ export async function POST(request: Request) {
     }
 
     const input = z.object({
-      action: z.enum(['message', 'mode', 'status', 'stage']),
+      action: z.enum(['message', 'mode', 'status', 'stage', 'assign']),
       conversationId: z.string().uuid(),
       text: z.string().trim().min(1).max(2000).optional(),
       mode: z.enum(['ai', 'human']).optional(),
       status: z.enum(['open', 'waiting', 'closed']).optional(),
       salesStage: z.enum(CONVERSATION_SALES_STAGES).optional(),
+      assignedUserId: z.string().min(1).max(200).nullable().optional(),
     }).parse(JSON.parse(raw));
     const conversation = await requireConversation(ctx, input.conversationId);
 
@@ -240,7 +267,7 @@ export async function POST(request: Request) {
         `UPDATE conversations SET status = ?, updated_at = ?
           WHERE id = ? AND workspace_owner_id = ?`,
       ).bind(input.status, now, input.conversationId, ctx.access.ownerId).run();
-    } else {
+    } else if (input.action === 'stage') {
       if (!input.salesStage) return json({ error: 'Selecciona una etapa comercial.' }, 400);
       await ctx.db.prepare(
         `UPDATE conversations SET sales_stage = ?, updated_at = ?
@@ -251,6 +278,25 @@ export async function POST(request: Request) {
         user: ctx.user,
         action: 'conversation.stage',
         summary: 'Actualizó la etapa comercial de una conversación',
+      });
+    } else {
+      const conversationStore = ctx.workspace.stores.find((store) => store.id === conversation.store_id);
+      if (!conversationStore?.modules.advisors) {
+        return json({ error: 'Activa Equipo de asesores en la configuración de esta tienda.' }, 409);
+      }
+      const advisorId = input.assignedUserId ?? null;
+      if (advisorId && !await validAdvisor(ctx, advisorId)) {
+        return json({ error: 'La persona seleccionada no pertenece a este equipo.' }, 404);
+      }
+      await ctx.db.prepare(
+        `UPDATE conversations SET assigned_user_id = ?, mode = 'human', status = 'open', updated_at = ?
+          WHERE id = ? AND workspace_owner_id = ?`,
+      ).bind(advisorId, now, input.conversationId, ctx.access.ownerId).run();
+      await recordWorkspaceActivity(ctx.db, {
+        access: ctx.access,
+        user: ctx.user,
+        action: 'conversation.assign',
+        summary: advisorId ? 'Asignó una conversación a una persona del equipo' : 'Dejó una conversación sin responsable',
       });
     }
     return json({ conversations: await listConversations(ctx) });
