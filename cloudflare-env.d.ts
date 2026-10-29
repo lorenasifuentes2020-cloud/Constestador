@@ -12,5 +12,8 @@ declare namespace Cloudflare {
     WHATSAPP_APP_SECRET?: string;
     WHATSAPP_VERIFY_TOKEN?: string;
     WHATSAPP_GRAPH_VERSION?: string;
+    NEXO_ADMIN_PASSWORD?: string;
+    NEXO_ADMIN_EMAIL?: string;
+    NEXO_OWNER_ID?: string;
   }
 }
