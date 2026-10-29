@@ -4,6 +4,7 @@ import { normalizeWorkspace, type Workspace } from '../../../lib/domain';
 import { recordWorkspaceActivity } from '../../../lib/workspace-audit';
 import { resolveWorkspaceAccess, selectedWorkspaceOwner } from '../../../lib/workspace-access';
 import { whatsappGraphVersion } from '../../../lib/whatsapp';
+import { resolveWhatsAppStoreId } from '../../../lib/whatsapp-channel-target';
 import { getChatGPTUser } from '../../chatgpt-auth';
 
 export const dynamic = 'force-dynamic';
@@ -78,20 +79,32 @@ export async function POST(request: Request) {
       displayPhoneNumber: z.string().trim().max(30),
       enabled: z.boolean(),
     }).parse(JSON.parse(raw));
-    const store = ctx.workspace.stores.find((item) => item.id === input.storeId);
-    if (!store) return json({ error: 'La tienda no pertenece a este espacio.' }, 404);
+    const numberChannel = await ctx.db.prepare(
+      `SELECT workspace_owner_id, store_id FROM whatsapp_channels
+        WHERE phone_number_id = ? LIMIT 1`,
+    ).bind(input.phoneNumberId).first<{ workspace_owner_id: string; store_id: string }>();
+    const recoverableStoreId = numberChannel?.workspace_owner_id === ctx.access.ownerId
+      ? numberChannel.store_id
+      : null;
+    const targetStoreId = resolveWhatsAppStoreId(ctx.workspace, input.storeId, recoverableStoreId);
+    if (!targetStoreId) {
+      return json({
+        error: 'La sesión cambió de espacio. Actualiza la página para cargar la tienda conectada.',
+        code: 'workspace_changed',
+      }, 409);
+    }
     if (input.enabled && !(env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_APP_SECRET && env.WHATSAPP_VERIFY_TOKEN)) {
       return json({ error: 'Primero configura los tres secretos de WhatsApp en el servidor.' }, 503);
     }
     const collision = await ctx.db.prepare(
       `SELECT workspace_owner_id, store_id FROM whatsapp_channels
         WHERE phone_number_id = ? AND NOT (workspace_owner_id = ? AND store_id = ?)`,
-    ).bind(input.phoneNumberId, ctx.access.ownerId, input.storeId)
+    ).bind(input.phoneNumberId, ctx.access.ownerId, targetStoreId)
       .first<{ workspace_owner_id: string; store_id: string }>();
     if (collision) return json({ error: 'Ese identificador de número ya está conectado a otra tienda.' }, 409);
     const existing = await ctx.db.prepare(
       'SELECT id FROM whatsapp_channels WHERE workspace_owner_id = ? AND store_id = ?',
-    ).bind(ctx.access.ownerId, input.storeId).first<{ id: string }>();
+    ).bind(ctx.access.ownerId, targetStoreId).first<{ id: string }>();
     const now = new Date().toISOString();
     if (existing) {
       await ctx.db.prepare(
@@ -106,7 +119,7 @@ export async function POST(request: Request) {
          (id, workspace_owner_id, store_id, phone_number_id, business_account_id,
           display_phone_number, enabled, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(crypto.randomUUID(), ctx.access.ownerId, input.storeId, input.phoneNumberId,
+      ).bind(crypto.randomUUID(), ctx.access.ownerId, targetStoreId, input.phoneNumberId,
         input.businessAccountId, input.displayPhoneNumber, input.enabled, now, now).run();
     }
     await recordWorkspaceActivity(ctx.db, {
@@ -115,7 +128,10 @@ export async function POST(request: Request) {
       action: 'channel.whatsapp',
       summary: input.enabled ? 'Activó WhatsApp para una tienda' : 'Guardó o pausó la conexión de WhatsApp',
     });
-    return json({ channels: await listChannels(ctx.db, ctx.access.ownerId) });
+    return json({
+      channels: await listChannels(ctx.db, ctx.access.ownerId),
+      reload: targetStoreId !== input.storeId,
+    });
   } catch (error) {
     return failure(error);
   }
