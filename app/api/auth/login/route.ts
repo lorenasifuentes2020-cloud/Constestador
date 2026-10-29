@@ -7,10 +7,10 @@ export async function POST(request: Request) {
   if (!env.NEXO_ADMIN_PASSWORD) {
     return Response.json({ error: "El acceso todavía no está configurado en Cloudflare." }, { status: 503 });
   }
-  const body = (await request.json().catch(() => null)) as { password?: unknown; returnTo?: unknown } | null;
-  const password = typeof body?.password === "string" ? body.password : "";
-  if (!(await sameSecret(password, env.NEXO_ADMIN_PASSWORD))) {
-    return Response.json({ error: "Contraseña incorrecta." }, { status: 401 });
+  const body = (await request.json().catch(() => null)) as { pin?: unknown; returnTo?: unknown } | null;
+  const pin = typeof body?.pin === "string" ? body.pin : "";
+  if (!/^\d{6}$/.test(pin) || !(await sameSecret(pin, env.NEXO_ADMIN_PASSWORD))) {
+    return Response.json({ error: "PIN incorrecto." }, { status: 401 });
   }
   const token = await createSessionToken(env.NEXO_ADMIN_PASSWORD);
   const returnTo = safeRelativeReturnPath(typeof body?.returnTo === "string" ? body.returnTo : "/");
