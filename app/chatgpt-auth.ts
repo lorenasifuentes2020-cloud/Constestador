@@ -34,11 +34,35 @@ export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   if (!(await verifySessionToken(token, env.NEXO_ADMIN_PASSWORD))) return null;
   const adminEmail = env.NEXO_ADMIN_EMAIL || "nicolchauca@gmail.com";
   return {
-    userId: env.NEXO_OWNER_ID || "nexo-owner",
+    userId: env.NEXO_OWNER_ID || await existingWorkspaceOwnerId() || "nexo-owner",
     displayName: "Nexo Ventas Hábitos",
     email: adminEmail,
     fullName: "Nexo Ventas Hábitos",
   };
+}
+
+async function existingWorkspaceOwnerId(): Promise<string | null> {
+  if (!env.DB) return null;
+  try {
+    const channel = await env.DB.prepare(
+      `SELECT workspace_owner_id
+         FROM whatsapp_channels
+        ORDER BY enabled DESC, updated_at DESC
+        LIMIT 1`,
+    ).first<{ workspace_owner_id: string }>();
+    if (channel?.workspace_owner_id) return channel.workspace_owner_id;
+
+    const workspace = await env.DB.prepare(
+      `SELECT owner_id
+         FROM workspaces
+        WHERE owner_id <> 'nexo-owner'
+        ORDER BY updated_at DESC
+        LIMIT 1`,
+    ).first<{ owner_id: string }>();
+    return workspace?.owner_id || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function requireChatGPTUser(returnTo: string): Promise<ChatGPTUser> {
