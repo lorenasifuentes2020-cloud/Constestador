@@ -40,14 +40,14 @@ test('envía historial breve a Gemini Flash sin razonamiento de alto consumo', a
   };
   const reply = await generateGeminiReply({
     apiKey: 'test-key',
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.8-flash',
     store: fixture(),
     message: '¿Tienes blusas?',
     history: [{ role: 'assistant', text: 'Hola' }],
     fetcher,
   });
   assert.equal(reply, 'Respuesta comercial');
-  assert.match(requestUrl, /gemini-2\.5-flash:generateContent$/);
+  assert.match(requestUrl, /gemini-3\.8-flash:generateContent$/);
   assert.equal(new Headers(requestInit?.headers).get('x-goog-api-key'), 'test-key');
   const body = JSON.parse(String(requestInit?.body));
   assert.equal(body.generationConfig.thinkingConfig, undefined);
@@ -59,7 +59,7 @@ test('explica cuando Gemini alcanza su cuota', async () => {
   await assert.rejects(
     generateGeminiReply({
       apiKey: 'test-key',
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       store: fixture(),
       message: 'Hola',
       history: [],

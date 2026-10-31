@@ -117,7 +117,7 @@ export async function generateGeminiReply(input: {
           contents,
           generationConfig: {
             temperature: 0.4,
-            ...(input.model.startsWith('gemini-3')
+            ...(input.model.includes('pro')
               ? { thinkingConfig: { thinkingLevel: 'HIGH' } }
               : {}),
           },
