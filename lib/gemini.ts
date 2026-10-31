@@ -13,6 +13,13 @@ type GeminiResponse = {
   }>;
 };
 
+type GeminiErrorResponse = {
+  error?: {
+    message?: string;
+    status?: string;
+  };
+};
+
 export class GeminiError extends Error {
   status: number;
 
@@ -123,13 +130,18 @@ export async function generateGeminiReply(input: {
   }
 
   if (!response.ok) {
+    const detail = await response.json().catch(() => null) as GeminiErrorResponse | null;
+    const providerMessage = detail?.error?.message?.replace(/\s+/g, ' ').trim().slice(0, 240) || '';
     if (response.status === 429) {
-      throw new GeminiError('Gemini alcanzó su cuota temporal. Inténtalo más tarde.', 429);
+      throw new GeminiError(`Gemini alcanzó su cuota temporal.${providerMessage ? ` ${providerMessage}` : ' Inténtalo más tarde.'}`, 429);
     }
     if (response.status === 401 || response.status === 403) {
-      throw new GeminiError('La clave de Gemini no es válida o no tiene acceso al modelo.', 503);
+      throw new GeminiError(`La clave de Gemini no es válida o no tiene acceso al modelo.${providerMessage ? ` ${providerMessage}` : ''}`, 503);
     }
-    throw new GeminiError('Gemini no pudo generar una respuesta.', 502);
+    if (response.status === 404) {
+      throw new GeminiError(`El modelo de Gemini no está disponible para esta clave.${providerMessage ? ` ${providerMessage}` : ''}`, 503);
+    }
+    throw new GeminiError(`Gemini rechazó la solicitud.${providerMessage ? ` ${providerMessage}` : ''}`, 502);
   }
 
   const data = await response.json() as GeminiResponse;
