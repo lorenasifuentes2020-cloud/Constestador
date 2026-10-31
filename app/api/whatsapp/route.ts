@@ -46,6 +46,22 @@ async function listChannels(db: D1Database, ownerId: string) {
   }));
 }
 
+async function recentWebhookEvents(db: D1Database) {
+  const result = await db.prepare(
+    `SELECT phone_number_id, status, error, received_at, processed_at
+       FROM whatsapp_events
+      ORDER BY received_at DESC
+      LIMIT 5`,
+  ).all<Record<string, unknown>>();
+  return result.results.map((row) => ({
+    phoneNumberId: String(row.phone_number_id),
+    status: String(row.status),
+    error: row.error ? String(row.error) : null,
+    receivedAt: String(row.received_at),
+    processedAt: row.processed_at ? String(row.processed_at) : null,
+  }));
+}
+
 export async function GET(request: Request) {
   try {
     const ctx = await context(request);
@@ -59,6 +75,9 @@ export async function GET(request: Request) {
       },
       graphVersion: whatsappGraphVersion(env),
       webhookUrl: `${new URL(request.url).origin}/api/whatsapp/webhook`,
+      diagnostics: {
+        recentEvents: await recentWebhookEvents(ctx.db),
+      },
     });
   } catch (error) {
     return failure(error);
