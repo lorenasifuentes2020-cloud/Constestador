@@ -101,12 +101,13 @@ async function processMessage(phoneNumberId: string, message: IncomingMessage, c
         WHERE workspace_owner_id = ? AND channel = 'WhatsApp' AND external_id = ?`,
     ).bind(channel.workspace_owner_id, externalId).first<{ id: string; mode: 'ai' | 'human' }>();
     if (!conversation) {
-      conversation = { id: crypto.randomUUID(), mode: 'ai' };
+      // WhatsApp starts in human mode so the team decides when an AI should reply.
+      conversation = { id: crypto.randomUUID(), mode: 'human' };
       await db.prepare(
         `INSERT INTO conversations
          (id, workspace_owner_id, store_id, channel, external_id, customer_name,
           status, mode, assigned_user_id, last_message_preview, last_message_at, created_at, updated_at)
-         VALUES (?, ?, ?, 'WhatsApp', ?, ?, 'open', 'ai', NULL, '', ?, ?, ?)`,
+         VALUES (?, ?, ?, 'WhatsApp', ?, ?, 'open', 'human', NULL, '', ?, ?, ?)`,
       ).bind(conversation.id, channel.workspace_owner_id, store.id, externalId,
         customerName || `WhatsApp ${message.from.slice(-4)}`, now, now, now).run();
     }
