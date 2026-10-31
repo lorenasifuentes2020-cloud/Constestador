@@ -80,6 +80,41 @@ export async function sendWhatsAppText(input: {
   return data.messages?.[0]?.id || null;
 }
 
+export async function subscribeWhatsAppApp(input: {
+  env: WhatsAppEnvironment;
+  businessAccountId: string;
+  fetcher?: typeof fetch;
+}) {
+  if (!input.env.WHATSAPP_ACCESS_TOKEN) {
+    throw new WhatsAppError('Falta configurar el token de acceso de WhatsApp.', 503);
+  }
+  if (!/^\d{5,30}$/.test(input.businessAccountId)) {
+    throw new WhatsAppError('El ID de la cuenta de WhatsApp Business no es válido.', 400);
+  }
+  const url = `https://graph.facebook.com/${whatsappGraphVersion(input.env)}/${input.businessAccountId}/subscribed_apps`;
+  let response: Response;
+  try {
+    response = await (input.fetcher || fetch)(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${input.env.WHATSAPP_ACCESS_TOKEN}` },
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    throw new WhatsAppError('Meta no respondió al intentar conectar el webhook.');
+  }
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new WhatsAppError('El token de WhatsApp venció o no tiene permiso para conectar la cuenta.', 503);
+    }
+    throw new WhatsAppError('Meta no permitió asociar esta aplicación a la cuenta de WhatsApp.');
+  }
+  const data = await response.json().catch(() => null) as { success?: boolean } | null;
+  if (data?.success !== true) {
+    throw new WhatsAppError('Meta no confirmó la conexión del webhook con la cuenta.');
+  }
+  return true;
+}
+
 export function whatsappRecipient(externalId: string) {
   const parts = externalId.split(':');
   const recipient = parts.at(-1) || '';

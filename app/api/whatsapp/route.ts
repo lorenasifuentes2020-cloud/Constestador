@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { normalizeWorkspace, type Workspace } from '../../../lib/domain';
 import { recordWorkspaceActivity } from '../../../lib/workspace-audit';
 import { resolveWorkspaceAccess, selectedWorkspaceOwner } from '../../../lib/workspace-access';
-import { whatsappGraphVersion } from '../../../lib/whatsapp';
+import { subscribeWhatsAppApp, whatsappGraphVersion, WhatsAppError } from '../../../lib/whatsapp';
 import { resolveWhatsAppStoreId } from '../../../lib/whatsapp-channel-target';
 import { getChatGPTUser } from '../../chatgpt-auth';
 
@@ -114,6 +114,17 @@ export async function POST(request: Request) {
     }
     if (input.enabled && !(env.WHATSAPP_ACCESS_TOKEN && env.WHATSAPP_APP_SECRET && env.WHATSAPP_VERIFY_TOKEN)) {
       return json({ error: 'Primero configura los tres secretos de WhatsApp en el servidor.' }, 503);
+    }
+    if (input.enabled) {
+      if (!input.businessAccountId) {
+        return json({ error: 'Ingresa el ID de la cuenta de WhatsApp Business para conectar los mensajes.' }, 400);
+      }
+      try {
+        await subscribeWhatsAppApp({ env, businessAccountId: input.businessAccountId });
+      } catch (error) {
+        if (error instanceof WhatsAppError) return json({ error: error.message }, error.status);
+        throw error;
+      }
     }
     const collision = await ctx.db.prepare(
       `SELECT workspace_owner_id, store_id FROM whatsapp_channels

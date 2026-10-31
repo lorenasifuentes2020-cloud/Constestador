@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   sendWhatsAppText,
+  subscribeWhatsAppApp,
   verifyWhatsAppSignature,
   whatsappGraphVersion,
   whatsappRecipient,
@@ -50,4 +51,20 @@ test('uses safe defaults and extracts the recipient from conversation ids', () =
   assert.equal(whatsappGraphVersion({ WHATSAPP_GRAPH_VERSION: 'invalid' }), 'v23.0');
   assert.equal(whatsappRecipient('12345678901:51999999999'), '51999999999');
   assert.equal(whatsappRecipient('invalid'), null);
+});
+
+test('subscribes the app to the WhatsApp Business account', async () => {
+  let request: { url: string; init?: RequestInit } | undefined;
+  const success = await subscribeWhatsAppApp({
+    env: { WHATSAPP_ACCESS_TOKEN: 'token', WHATSAPP_GRAPH_VERSION: 'v26.0' },
+    businessAccountId: '1705999217905169',
+    fetcher: async (url, init) => {
+      request = { url: String(url), init };
+      return Response.json({ success: true });
+    },
+  });
+  assert.equal(success, true);
+  assert.equal(request?.url, 'https://graph.facebook.com/v26.0/1705999217905169/subscribed_apps');
+  assert.equal(request?.init?.method, 'POST');
+  assert.equal((request?.init?.headers as Record<string, string>).Authorization, 'Bearer token');
 });
