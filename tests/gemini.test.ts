@@ -28,7 +28,7 @@ test('el contexto de Gemini incluye solo datos comerciales de la tienda', () => 
   assert.match(prompt, /No menciones títulos ni fuentes internas/);
 });
 
-test('envía historial breve a Gemini 3.1 Pro con razonamiento alto', async () => {
+test('envía historial breve a Gemini Flash sin razonamiento de alto consumo', async () => {
   let requestUrl = '';
   let requestInit: RequestInit | undefined;
   const fetcher: typeof fetch = async (url, init) => {
@@ -40,17 +40,17 @@ test('envía historial breve a Gemini 3.1 Pro con razonamiento alto', async () =
   };
   const reply = await generateGeminiReply({
     apiKey: 'test-key',
-    model: 'gemini-3.1-pro-preview',
+    model: 'gemini-2.5-flash',
     store: fixture(),
     message: '¿Tienes blusas?',
     history: [{ role: 'assistant', text: 'Hola' }],
     fetcher,
   });
   assert.equal(reply, 'Respuesta comercial');
-  assert.match(requestUrl, /gemini-3\.1-pro-preview:generateContent$/);
+  assert.match(requestUrl, /gemini-2\.5-flash:generateContent$/);
   assert.equal(new Headers(requestInit?.headers).get('x-goog-api-key'), 'test-key');
   const body = JSON.parse(String(requestInit?.body));
-  assert.equal(body.generationConfig.thinkingConfig.thinkingLevel, 'HIGH');
+  assert.equal(body.generationConfig.thinkingConfig, undefined);
   assert.equal(body.contents[0].role, 'model');
   assert.equal(body.contents[1].parts[0].text, '¿Tienes blusas?');
 });
@@ -59,7 +59,7 @@ test('explica cuando Gemini alcanza su cuota', async () => {
   await assert.rejects(
     generateGeminiReply({
       apiKey: 'test-key',
-      model: 'gemini-3.1-pro-preview',
+      model: 'gemini-2.5-flash',
       store: fixture(),
       message: 'Hola',
       history: [],

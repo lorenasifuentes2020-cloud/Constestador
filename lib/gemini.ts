@@ -110,7 +110,9 @@ export async function generateGeminiReply(input: {
           contents,
           generationConfig: {
             temperature: 0.4,
-            thinkingConfig: { thinkingLevel: 'HIGH' },
+            ...(input.model.startsWith('gemini-3')
+              ? { thinkingConfig: { thinkingLevel: 'HIGH' } }
+              : {}),
           },
         }),
         signal: AbortSignal.timeout(45_000),

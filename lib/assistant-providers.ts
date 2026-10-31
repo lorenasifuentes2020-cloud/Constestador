@@ -28,7 +28,7 @@ export function assistantProviderConfigs(env: AssistantProviderEnvironment): Ass
   return {
     gemini: {
       apiKey: env.GEMINI_API_KEY,
-      model: env.GEMINI_MODEL || 'gemini-3.1-pro-preview',
+      model: env.GEMINI_MODEL || 'gemini-2.5-flash',
     },
     anthropic: {
       apiKey: env.ANTHROPIC_API_KEY,
